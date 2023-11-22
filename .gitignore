@@ -1,3 +1,5 @@
 datasets/*
 .DS_Store
 __pycache__
+.vscode
+test.*
