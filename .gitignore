@@ -4,4 +4,3 @@ outputs/*
 __pycache__
 .vscode
 test.*
-test_*

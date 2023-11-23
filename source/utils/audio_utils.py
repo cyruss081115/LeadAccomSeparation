@@ -35,6 +35,8 @@ def plot_spectrogram(
         save_dir (str, optional): Path to save the figure. No saving when value is None. Defaults to None.
         verbose (bool, optional): Whether to print the information of saving the figure. Defaults to True.
     """
+    assert input.dim() == 2 or input.dim() == 3, "The input must be either a spectrogram (n_channels, n_fft, n_frames) or a waveform (n_channels, n_samples)"
+
     is_waveform = n_fft is not None and hop_length is not None
     if is_waveform:
         info("Converting waveform to spectrogram...") if verbose else ...

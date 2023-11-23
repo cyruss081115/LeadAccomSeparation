@@ -65,3 +65,5 @@ class VAEProcessing(Processing):
 
     def postprocess(self, feature: torch.Tensor) -> torch.Tensor:
         return NotImplementedError
+
+__all__ = ['Processing', 'STFTProcessing']
