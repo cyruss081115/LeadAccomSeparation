@@ -27,7 +27,7 @@ class ANSI:
 
 
 def gettime(day: bool = True, time: bool = True, sep: str = ' - ', daysep: str = '/', timesep: str = ':'):
-    now = datetime.now()
+    now = datetime.datetime.now()
     d = f"{now.year}{daysep}{now.month}{daysep}{now.day}"
     t = f"{now.hour}{timesep}{now.minute}{timesep}{now.second}"
     if day and time:
