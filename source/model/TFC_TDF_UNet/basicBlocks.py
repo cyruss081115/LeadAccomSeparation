@@ -2,9 +2,10 @@ from typing import Literal, Tuple
 from abc import ABC
 
 import torch
-import einops
 import torch.nn as nn
 import torch.nn.functional as F
+
+import einops
 
 
 def get_activation(
@@ -16,7 +17,7 @@ def get_activation(
     elif activation == 'SiLU':
         return nn.SiLU()
     else:
-        raise Exception
+        raise ValueError(f"Unsupported activation function: {activation}")
 
 
 class BasicBlock(nn.Module, ABC):
@@ -38,7 +39,7 @@ class BasicBlock(nn.Module, ABC):
         pass
 
 
-class TDFBlock(BasicBlock):
+class TimeDistributedFullyConnectedBlock(BasicBlock):
     r"""
     Time-distributed fully connected block. It will be applied to each channel of each frame separately and identically.
     Different from the original paper, batch normalization is applied before the fully connected layer.
@@ -59,7 +60,7 @@ class TDFBlock(BasicBlock):
                  num_layers: int,
                  activation: str = 'ReLU',
                  bias: bool = False):
-        super(TDFBlock, self).__init__()
+        super(TimeDistributedFullyConnectedBlock, self).__init__()
         self._check_init(channels, frequency_bins, bottleneck, num_layers, activation, bias)
         self.norm_fc_act_stack = nn.ModuleList()
 
@@ -121,7 +122,7 @@ class TDFBlock(BasicBlock):
             raise ValueError("The number of frequency bins must be divisible by the bottleneck dimension.")
 
 
-class TDCBlock(BasicBlock):
+class TimeDistributedConvolutionBlock(BasicBlock):
     r"""
     Time-distributed convolution block. It has a DenseNet-like architecture.
     [batch, channels, n_frames, frequency_bins] -> [batch, growth_rate, n_frames, frequency_bins]
@@ -141,7 +142,7 @@ class TDCBlock(BasicBlock):
                  kernel_size: int,
                  activation: str = 'ReLU',
                  bias: bool = False):
-        super(TDCBlock, self).__init__()
+        super(TimeDistributedConvolutionBlock, self).__init__()
         self._check_init(in_channels, growth_rate, num_layers, kernel_size, activation, bias)
         self.norm_conv_act_stack = nn.ModuleList()
 
@@ -188,7 +189,7 @@ class TDCBlock(BasicBlock):
             raise ValueError("The kernel size must be odd to keep input freq dim and output freq dim identical.")
 
 
-class TDSABlock(BasicBlock):
+class TimeDistributedSelfAttentionBlock(BasicBlock):
     r"""
     Time-distributed self-attention block. It will be applied to the frequency dimension of input.
     [batch, channels, n_frames, frequency_bins] -> [batch, channels, n_frames, frequency_bins]
@@ -208,7 +209,7 @@ class TDSABlock(BasicBlock):
                  dropout: float = 0.,
                  activation: str = 'ReLU',
                  bias: bool = False):
-        super(TDSABlock, self).__init__()
+        super(TimeDistributedSelfAttentionBlock, self).__init__()
         self._check_init(embed_dim, num_heads, num_layers, dropout, activation, bias)
         self.norm_attn_act_stack = nn.ModuleList()
 
@@ -247,7 +248,7 @@ class TDSABlock(BasicBlock):
             raise ValueError("The dropout rate must be between 0 and 1.")
 
 
-class DownSampleBlock(BasicBlock):
+class DownSample2DBlock(BasicBlock):
     r"""
     Downsample block. It will reduce the frequency dimension and time dimension by half.
     [batch, in_channels, n_frames, frequency_bins] -> [batch, out_channels, n_frames // 2, frequency_bins // 2]
@@ -259,7 +260,7 @@ class DownSampleBlock(BasicBlock):
         bias (bool, optional): Whether to use bias in the convolution layer. Defaults to False.
     """
     def __init__(self, in_channels: int, out_channels: int, activation: str = 'ReLU', bias: bool = False):
-        super(DownSampleBlock, self).__init__()
+        super(DownSample2DBlock, self).__init__()
         self.norm_conv_act = nn.Sequential(
             nn.BatchNorm2d(in_channels),
             nn.Conv2d(in_channels, out_channels, kernel_size=[2, 2], stride=2, padding=0, bias=bias),
@@ -280,7 +281,7 @@ class DownSampleBlock(BasicBlock):
         return self.norm_conv_act(x)
 
 
-class UpSampleBlock(BasicBlock):
+class UpSample2DBlock(BasicBlock):
     r"""
     Upsample block. It will double the frequency dimension and time dimension.
     [batch, in_channels, n_frames, frequency_bins] -> [batch, out_channels, n_frames * 2, frequency_bins * 2]
@@ -292,7 +293,7 @@ class UpSampleBlock(BasicBlock):
         bias (bool, optional): Whether to use bias in the convolution layer. Defaults to False.
     """
     def __init__(self, in_channels: int, out_channels: int, activation: str = 'ReLU', bias: bool = False):
-        super(UpSampleBlock, self).__init__()
+        super(UpSample2DBlock, self).__init__()
         self.norm_conv_act = nn.Sequential(
             nn.BatchNorm2d(in_channels),
             nn.ConvTranspose2d(in_channels, out_channels, kernel_size=[2, 2], stride=2, padding=0, bias=bias),
@@ -313,7 +314,7 @@ class UpSampleBlock(BasicBlock):
         return self.norm_conv_act(x)
 
 
-class TFCBlock(BasicBlock):
+class TimeFrequencyConvolutionBlock(BasicBlock):
     r"""
     Time-frequency convolution block. It has a DenseNet-like architecture.
     [batch, channels, n_frames, frequency_bins] -> [batch, growth_rate, n_frames, frequency_bins]
@@ -335,7 +336,7 @@ class TFCBlock(BasicBlock):
                  kernel_size: Tuple[int, int] = (3, 3),
                  activation: str = 'ReLU',
                  bias: bool = False):
-        super(TFCBlock, self).__init__()
+        super(TimeFrequencyConvolutionBlock, self).__init__()
         self._check_init(in_channels, growth_rate, num_layers, kernel_size, activation, bias)
         kt, kf = kernel_size
         self.norm_conv_act_stack = nn.ModuleList()
