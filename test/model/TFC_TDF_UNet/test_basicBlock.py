@@ -1,7 +1,8 @@
 import sys, os
 sys.path.append(os.getcwd())
 
-from source.model.TFC_TDF_UNet.basicBlock import TDFBlock, TDCBlock, TDSABlock
+from source.model.TFC_TDF_UNet.basicBlock import \
+    TDFBlock, TDCBlock, TDSABlock, DownSampleBlock, UpSampleBlock
 import torch.nn as nn
 import unittest
 import torch
@@ -257,5 +258,93 @@ class TestTDSABlock(unittest.TestCase):
         self.assertEqual(list(output.shape), [3, 4, 100, 1024])
 
 
+class TestDownSampleBlock(unittest.TestCase):
+    def test_init_same_in_out_channels(self):
+        downsample_block = DownSampleBlock(in_channels=4, out_channels=4)
+        expected_architecture = nn.Sequential(
+                nn.BatchNorm2d(4),
+                nn.Conv2d(4, 4, kernel_size=[2, 2], stride=2, padding=0, bias=False),
+                nn.ReLU(),
+            )
+        self.assertEqual(
+            downsample_block.norm_conv_act.__str__(),
+            expected_architecture.__str__())
+    
+    def test_init_different_in_out_channels(self):
+        downsample_block = DownSampleBlock(in_channels=2, out_channels=4)
+        expected_architecture = nn.Sequential(
+                nn.BatchNorm2d(2),
+                nn.Conv2d(2, 4, kernel_size=[2, 2], stride=2, padding=0, bias=False),
+                nn.ReLU(),
+            )
+        self.assertEqual(
+            downsample_block.norm_conv_act.__str__(),
+            expected_architecture.__str__())
+
+    def test_forward_output_dims_same_in_out_channels(self):
+        downsample_block = DownSampleBlock(in_channels=4, out_channels=4)
+        input = torch.rand([1, 4, 2048, 1024]) # [B, C, T, F]
+        output = downsample_block(input)
+        self.assertEqual(list(output.shape), [1, 4, 1024, 512])
+    
+    def test_forward_output_dims_different_in_out_channels(self):
+        downsample_block = DownSampleBlock(in_channels=4, out_channels=2)
+        input = torch.rand([1, 4, 2048, 1024])
+        output = downsample_block(input)
+        self.assertEqual(list(output.shape), [1, 2, 1024, 512])
+
+    def test_forward_output_dims_batach_greater_than_1(self):
+        downsample_block = DownSampleBlock(in_channels=4, out_channels=4)
+        input = torch.rand([3, 4, 1024, 512]) # [B, C, T, F]
+        output = downsample_block(input)
+        self.assertEqual(list(output.shape), [3, 4, 512, 256])
+        
+
+class TestUpSampleBlock(unittest.TestCase):
+    def test_init_same_in_out_channels(self):
+        downsample_block = UpSampleBlock(in_channels=4, out_channels=4)
+        expected_architecture = nn.Sequential(
+                nn.BatchNorm2d(4),
+                nn.ConvTranspose2d(4, 4, kernel_size=[2, 2], stride=2, padding=0, bias=False),
+                nn.ReLU(),
+            )
+        self.assertEqual(
+            downsample_block.norm_conv_act.__str__(),
+            expected_architecture.__str__())
+    
+    def test_init_different_in_out_channels(self):
+        downsample_block = UpSampleBlock(in_channels=2, out_channels=4)
+        expected_architecture = nn.Sequential(
+                nn.BatchNorm2d(2),
+                nn.ConvTranspose2d(2, 4, kernel_size=[2, 2], stride=2, padding=0, bias=False),
+                nn.ReLU(),
+            )
+        self.assertEqual(
+            downsample_block.norm_conv_act.__str__(),
+            expected_architecture.__str__())
+
+    def test_forward_output_dims_same_in_out_channels(self):
+        downsample_block = UpSampleBlock(in_channels=4, out_channels=4)
+        input = torch.rand([1, 4, 1024, 512]) # [B, C, T, F]
+        output = downsample_block(input)
+        self.assertEqual(list(output.shape), [1, 4, 2048, 1024])
+    
+    def test_forward_output_dims_different_in_out_channels(self):
+        downsample_block = UpSampleBlock(in_channels=4, out_channels=2)
+        input = torch.rand([1, 4, 1024, 512])
+        output = downsample_block(input)
+        self.assertEqual(list(output.shape), [1, 2, 2048, 1024])
+
+    def test_forward_output_dims_batach_greater_than_1(self):
+        downsample_block = UpSampleBlock(in_channels=4, out_channels=4)
+        input = torch.rand([3, 4, 512, 256]) # [B, C, T, F]
+        output = downsample_block(input)
+        self.assertEqual(list(output.shape), [3, 4, 1024, 512])
+
+
+
 if __name__ == "__main__":
-    unittest.main()
+    suite = unittest.TestLoader().loadTestsFromModule(TestUpSampleBlock())
+    unittest.TextTestRunner().run(suite)
+
+    # unittest.main()

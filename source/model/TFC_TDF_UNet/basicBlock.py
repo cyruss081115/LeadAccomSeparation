@@ -31,9 +31,9 @@ class BasicBlock(nn.Module, ABC):
         r"""
         Forward propagate the feature tensor.
         Args:
-            feature (torch.Tensor): Tensor of feature of dimension (b, c, n_fft, n_frames)
+            feature (torch.Tensor): Tensor of feature of dimension (b, c, n_frames, n_fft // 2)
         Returns:
-            torch.Tensor: Tensor of feature of dimension (b, c, n_fft, n_frames)
+            torch.Tensor: Tensor of feature of dimension (b, c, n_frames, n_fft // 2)
         """
         pass
 
@@ -46,7 +46,7 @@ class TDFBlock(BasicBlock):
 
     Args:
         channels (int): Number of channels.
-        frequency_bins (int): Number of frequency bins, same as n_fft in STFT.
+        frequency_bins (int): Number of frequency bins, same as n_fft // 2.
         bottleneck (int): Bottleneck dimension, it should be a divisor of frequency_bins.
         num_layers (int): Number of layers.
         activation (str, optional): Activation function. Defaults to 'ReLU'.
@@ -102,10 +102,10 @@ class TDFBlock(BasicBlock):
         r"""
         Forward propagate the feature tensor.
         Args:
-            x (torch.Tensor): Tensor of feature of dimension (b, c, n_frames, n_fft)
+            x (torch.Tensor): Tensor of feature of dimension (b, c, n_frames, n_fft // 2)
 
         Returns:
-            torch.Tensor: Tensor of feature of dimension (b, c, n_frames, n_fft)
+            torch.Tensor: Tensor of feature of dimension (b, c, n_frames, n_fft // 2)
         """
         identity = x
         for norm_fc_act in self.norm_fc_act_stack:
@@ -194,7 +194,7 @@ class TDSABlock(BasicBlock):
     [batch, channels, n_frames, frequency_bins] -> [batch, channels, n_frames, frequency_bins]
 
     Args:
-        embed_dim (int): Embedding dimension, which is equivalent to n_fft.
+        embed_dim (int): Embedding dimension, which is equivalent to n_fft // 2.
         num_heads (int): Number of heads.
         num_layers (int): Number of layers.
         dropout (float, optional): Dropout rate. Defaults to 0..
@@ -245,3 +245,69 @@ class TDSABlock(BasicBlock):
             raise ValueError("The number of layers must be greater than 0.")
         if dropout < 0 or dropout > 1:
             raise ValueError("The dropout rate must be between 0 and 1.")
+
+
+class DownSampleBlock(BasicBlock):
+    r"""
+    Downsample block. It will reduce the frequency dimension and time dimension by half.
+    [batch, in_channels, n_frames, frequency_bins] -> [batch, out_channels, n_frames // 2, frequency_bins // 2]
+
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        activation (str, optional): Activation function. Defaults to 'ReLU'.
+        bias (bool, optional): Whether to use bias in the convolution layer. Defaults to False.
+    """
+    def __init__(self, in_channels: int, out_channels: int, activation: str = 'ReLU', bias: bool = False):
+        super(DownSampleBlock, self).__init__()
+        self.norm_conv_act = nn.Sequential(
+            nn.BatchNorm2d(in_channels),
+            nn.Conv2d(in_channels, out_channels, kernel_size=[2, 2], stride=2, padding=0, bias=bias),
+            get_activation(activation),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        r"""
+        Forward propagate the feature tensor.
+        [batch, in_channels, n_frames, frequency_bins] -> [batch, out_channels, n_frames // 2, frequency_bins // 2]
+
+        Args:
+            x (torch.Tensor): Tensor of feature of dimension (b, in_c, n_frames, n_fft)
+        
+        Returns:
+            torch.Tensor: Tensor of feature of dimension (b, out_c, n_frames // 2, n_fft // 2)
+        """
+        return self.norm_conv_act(x)
+
+
+class UpSampleBlock(BasicBlock):
+    r"""
+    Upsample block. It will double the frequency dimension and time dimension.
+    [batch, in_channels, n_frames, frequency_bins] -> [batch, out_channels, n_frames * 2, frequency_bins * 2]
+    
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        activation (str, optional): Activation function. Defaults to 'ReLU'.
+        bias (bool, optional): Whether to use bias in the convolution layer. Defaults to False.
+    """
+    def __init__(self, in_channels: int, out_channels: int, activation: str = 'ReLU', bias: bool = False):
+        super(UpSampleBlock, self).__init__()
+        self.norm_conv_act = nn.Sequential(
+            nn.BatchNorm2d(in_channels),
+            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=[2, 2], stride=2, padding=0, bias=bias),
+            get_activation(activation),
+        )
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        r"""
+        Forward propagate the feature tensor.
+        [batch, in_channels, n_frames, frequency_bins] -> [batch, out_channels, n_frames * 2, frequency_bins * 2]
+
+        Args:
+            x (torch.Tensor): Tensor of feature of dimension (b, in_c, n_frames, n_fft)
+        
+        Returns:
+            torch.Tensor: Tensor of feature of dimension (b, out_c, n_frames * 2, n_fft * 2)
+        """
+        return self.norm_conv_act(x)
