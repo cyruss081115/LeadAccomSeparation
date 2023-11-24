@@ -19,12 +19,12 @@ def get_activation(
         raise Exception
 
 
-class IntermediateBlock(nn.Module, ABC):
+class BasicBlock(nn.Module, ABC):
     r"""
     Abstract class for intermediate blocks.
     """
     def __init__(self):
-        super(IntermediateBlock, self).__init__()
+        super(BasicBlock, self).__init__()
         pass
 
     def forward(self, feature: torch.Tensor) -> torch.Tensor:
@@ -38,7 +38,7 @@ class IntermediateBlock(nn.Module, ABC):
         pass
 
 
-class TDFBlock(IntermediateBlock):
+class TDFBlock(BasicBlock):
     r"""
     Time-distributed fully connected block. It will be applied to each channel of each frame separately and identically.
     Different from the original paper, batch normalization is applied before the fully connected layer.
@@ -121,7 +121,7 @@ class TDFBlock(IntermediateBlock):
             raise ValueError("The number of frequency bins must be divisible by the bottleneck dimension.")
 
 
-class TDCBlock(IntermediateBlock):
+class TDCBlock(BasicBlock):
     r"""
     Time-distributed convolution block. It has a DenseNet-like architecture.
     [batch, channels, n_frames, frequency_bins] -> [batch, growth_rate, n_frames, frequency_bins]
@@ -186,3 +186,62 @@ class TDCBlock(IntermediateBlock):
             raise ValueError("The kernel size must be greater than 0.")
         if kernel_size % 2 != 1:
             raise ValueError("The kernel size must be odd to keep input freq dim and output freq dim identical.")
+
+
+class TDSABlock(BasicBlock):
+    r"""
+    Time-distributed self-attention block. It will be applied to the frequency dimension of input.
+    [batch, channels, n_frames, frequency_bins] -> [batch, channels, n_frames, frequency_bins]
+
+    Args:
+        embed_dim (int): Embedding dimension, which is equivalent to n_fft.
+        num_heads (int): Number of heads.
+        num_layers (int): Number of layers.
+        dropout (float, optional): Dropout rate. Defaults to 0..
+        activation (str, optional): Activation function. Defaults to 'ReLU'.
+        bias (bool, optional): Whether to use bias in the convolution layer. Defaults to False.
+    """
+    def __init__(self,
+                 embed_dim: int,
+                 num_heads: int,
+                 num_layers: int,
+                 dropout: float = 0.,
+                 activation: str = 'ReLU',
+                 bias: bool = False):
+        super(TDSABlock, self).__init__()
+        self._check_init(embed_dim, num_heads, num_layers, dropout, activation, bias)
+        self.norm_attn_act_stack = nn.ModuleList()
+
+        for i in range(num_layers):
+            self.norm_attn_act_stack.append(
+                nn.Sequential(
+                    nn.BatchNorm1d(embed_dim),
+                    nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, bias=bias),
+                    get_activation(activation),
+                )
+            )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        batch, channels, n_frames, frequency_bins = x.shape
+        x = einops.rearrange(x, 'b c t f -> (b t c) f')
+        identity = x
+        for norm_attn_act in self.norm_attn_act_stack:
+            for net in norm_attn_act:
+                if isinstance(net, nn.MultiheadAttention):
+                    x, _ = net(x, x, x, need_weights=False) # query, key, value
+                else:
+                    x = net(x)
+        x = x + identity
+        return einops.rearrange(x, '(b t c) f -> b c t f', b=batch, t=n_frames, c=channels)
+
+    def _check_init(self, embed_dim,  num_heads, num_layers, dropout, activation, bias):
+        if embed_dim <= 0:
+            raise ValueError("The embedding dimension must be greater than 0.")
+        if num_heads <= 0:
+            raise ValueError("The number of heads must be greater than 0.")
+        if embed_dim % num_heads != 0:
+            raise ValueError("The embedding dimension must be divisible by the number of heads.")
+        if num_layers <= 0:
+            raise ValueError("The number of layers must be greater than 0.")
+        if dropout < 0 or dropout > 1:
+            raise ValueError("The dropout rate must be between 0 and 1.")

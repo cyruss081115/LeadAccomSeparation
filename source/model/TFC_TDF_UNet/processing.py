@@ -23,36 +23,54 @@ class STFTProcessing(Processing):
     def preprocess(self, waveform: torch.Tensor) -> torch.Tensor:
         r"""
         Apply STFT to a c-channeled waveform, concatenate the real and imaginary parts, and return the result.
+
         Args:
             waveform (torch.Tensor): Tensor of audio of dimension (b, c, n_samples)
+
         Returns:
-            torch.Tensor: Tensor of dimension (b, 2 * c, n_fft, n_frames)
+            torch.Tensor: Tensor of dimension (b, 2 * c, n_fft // 2, n_frames)
         """
         assert waveform.dim() == 3, "The input waveform must be of dimension (b, c, n_samples)."
 
         batch, channel, _ = waveform.shape
         waveform = einops.rearrange(waveform, 'b c n -> (b c) n')
-        spec = torch.stft(waveform, n_fft=self.n_fft, hop_length=self.hop_length, window=self.window, return_complex=True)
+        spec = torch.stft(
+            waveform, n_fft=self.n_fft, hop_length=self.hop_length, window=self.window, center=True, return_complex=True)
         spec = torch.view_as_real(spec) # [batch * channel, n_fft, n_frames, 2]
         spec = einops.rearrange(
             spec, "(b c) f t r-> b (r c) f t", b=batch, c=channel) # split b,c and concat real and imaginary parts
-        return spec
+        return spec[..., :self.n_fft // 2, :]
 
     def postprocess(self, feature: torch.Tensor) -> torch.Tensor:
         r"""
         Apply inverse STFT to a c-channeled feature, and return the result.
+
+        Note:
+            The feature must be of dimension (b, 2 * c, n_fft // 2, n_frames). It will padded with zeros to match the
+            frequency dimension requirements by `torch.istft`.
+            The output number of samples may return a shorter signal than the original waveform due to `torch.istft`
+
         Args:
-            feature (torch.Tensor): Tensor of feature of dimension (b, 2 * c, n_fft, n_frames)
+            feature (torch.Tensor): Tensor of feature of dimension (b, 2 * c, n_fft // 2, n_frames)
+            
         Returns:
-            torch.Tensor: Tensor of dimension (b, c, n_samples)
+            torch.Tensor: Tensor of dimension (b, c, n_samples).
         """
         assert feature.dim() == 4, "The input feature must be of dimension (b, 2 * c, n_fft, n_frames)."
 
-        batch, _, _, _ = feature.shape
+        b, _, _, _ = feature.shape
         feature = einops.rearrange(feature, 'b (r c) f t -> (b c) f t r', r=2)
+        feature = feature.contiguous()
+
+        # pad freq dimension to match dim required by one sided torch.istft
+        bc, f, t, r = feature.shape
+        n = (self.n_fft // 2) + 1
+        padding = torch.zeros([bc, n - f, t, r])
+        feature = torch.cat([feature, padding], dim=1)
+
         feature = torch.view_as_complex(feature) # [batch * channel, n_fft, n_frames]
         waveform = torch.istft(feature, n_fft=self.n_fft, hop_length=self.hop_length, window=self.window, return_complex=False)
-        waveform = einops.rearrange(waveform, "(b c) n -> b c n", b=batch)
+        waveform = einops.rearrange(waveform, "(b c) n -> b c n", b=b)
 
         return waveform
 
