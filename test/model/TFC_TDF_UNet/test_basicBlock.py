@@ -2,7 +2,7 @@ import sys, os
 sys.path.append(os.getcwd())
 
 from source.model.TFC_TDF_UNet.basicBlock import \
-    TDFBlock, TDCBlock, TDSABlock, DownSampleBlock, UpSampleBlock
+    TDFBlock, TDCBlock, TDSABlock, DownSampleBlock, UpSampleBlock, TFCBlock
 import torch.nn as nn
 import unittest
 import torch
@@ -342,9 +342,62 @@ class TestUpSampleBlock(unittest.TestCase):
         self.assertEqual(list(output.shape), [3, 4, 1024, 512])
 
 
+class TestTFCBlock(unittest.TestCase):
+    def test_init_num_layer_equals_1(self):
+        tfc_block = TFCBlock(in_channels=4, growth_rate=8, num_layers=1)
+        expected_architecture = nn.ModuleList([
+            nn.Sequential(
+                nn.BatchNorm2d(4),
+                nn.Conv2d(4, 8, kernel_size=(3, 3), stride=1, padding=1, bias=False),
+                nn.ReLU(),
+            )
+        ])
+        self.assertEqual(
+            tfc_block.norm_conv_act_stack.__str__(),
+            expected_architecture.__str__())
+
+    def test_init_kernel_size_not_odd(self):
+        with self.assertRaises(ValueError):
+            tfc_block = TFCBlock(in_channels=4, growth_rate=8, num_layers=1, kernel_size=(2, 2))
+
+    def test_init_num_layer_greater_than_1(self):
+        tfc_block = TFCBlock(in_channels=4, growth_rate=8, num_layers=3)
+        expected_architecture = nn.ModuleList([
+            nn.Sequential(
+                nn.BatchNorm2d(4),
+                nn.Conv2d(4, 8, kernel_size=(3, 3), stride=1, padding=1, bias=False),
+                nn.ReLU(),
+            ),
+            nn.Sequential(
+                nn.BatchNorm2d(4+8),
+                nn.Conv2d(4+8, 8, kernel_size=(3, 3), stride=1, padding=1, bias=False),
+                nn.ReLU(),
+            ),
+            nn.Sequential(
+                nn.BatchNorm2d(4+(8*2)),
+                nn.Conv2d(4+(8*2), 8, kernel_size=(3, 3), stride=1, padding=1, bias=False),
+                nn.ReLU(),
+            ),
+        ])
+        self.assertEqual(
+            tfc_block.norm_conv_act_stack.__str__(),
+            expected_architecture.__str__())
+
+    def test_forward_num_layer_equals_1(self):
+        tfc_block = TFCBlock(in_channels=2, growth_rate=8, num_layers=1)
+        input = torch.rand([1, 2, 1024, 512])
+        output = tfc_block(input)
+        self.assertEqual(list(output.shape), [1, 8, 1024, 512])
+
+    def test_forward_num_layer_greater_than_1(self):
+        tfc_block = TFCBlock(in_channels=2, growth_rate=8, num_layers=3)
+        input = torch.rand([1, 2, 1024, 512])
+        output = tfc_block(input)
+        self.assertEqual(list(output.shape), [1, 8, 1024, 512])
+
 
 if __name__ == "__main__":
-    suite = unittest.TestLoader().loadTestsFromModule(TestUpSampleBlock())
+    suite = unittest.TestLoader().loadTestsFromModule(TestTFCBlock())
     unittest.TextTestRunner().run(suite)
 
     # unittest.main()

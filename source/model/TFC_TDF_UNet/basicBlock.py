@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Tuple
 from abc import ABC
 
 import torch
@@ -142,7 +142,7 @@ class TDCBlock(BasicBlock):
                  activation: str = 'ReLU',
                  bias: bool = False):
         super(TDCBlock, self).__init__()
-        # self._check_init(in_channels, growth_rate, num_layers, kernel_size, activation, bias)
+        self._check_init(in_channels, growth_rate, num_layers, kernel_size, activation, bias)
         self.norm_conv_act_stack = nn.ModuleList()
 
         current_channels = in_channels
@@ -311,3 +311,71 @@ class UpSampleBlock(BasicBlock):
             torch.Tensor: Tensor of feature of dimension (b, out_c, n_frames * 2, n_fft * 2)
         """
         return self.norm_conv_act(x)
+
+
+class TFCBlock(BasicBlock):
+    r"""
+    Time-frequency convolution block. It has a DenseNet-like architecture.
+    [batch, channels, n_frames, frequency_bins] -> [batch, growth_rate, n_frames, frequency_bins]
+
+    Args:
+        in_channels (int): Number of input channels.
+        growth_rate (int): Number of output channels.
+        num_layers (int): Number of layers.
+        kernel_size (Tuple[int, int]):
+            Kernel size of the convolution layer. It should be odd to keep input freq dim and output freq dim identical.
+            Defaults to (3, 3).
+        activation (str, optional): Activation function. Defaults to 'ReLU'.
+        bias (bool, optional): Whether to use bias in the convolution layer. Defaults to False.
+    """
+    def __init__(self,
+                 in_channels: int,
+                 growth_rate: int,
+                 num_layers: int,
+                 kernel_size: Tuple[int, int] = (3, 3),
+                 activation: str = 'ReLU',
+                 bias: bool = False):
+        super(TFCBlock, self).__init__()
+        self._check_init(in_channels, growth_rate, num_layers, kernel_size, activation, bias)
+        kt, kf = kernel_size
+        self.norm_conv_act_stack = nn.ModuleList()
+
+        current_channels = in_channels
+        for i in range(num_layers):
+            self.norm_conv_act_stack.append(
+                nn.Sequential(
+                    nn.BatchNorm2d(current_channels),
+                    nn.Conv2d(current_channels, growth_rate, [kt, kf], padding=[(kt - 1) // 2, (kf - 1) // 2], bias=bias),
+                    get_activation(activation),
+                )
+            )
+            current_channels += growth_rate
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        r"""
+        Forward propagate the feature tensor.
+        [batch, channels, n_frames, frequency_bins] -> [batch, growth_rate, n_frames, frequency_bins]
+
+        Args:
+            x (torch.Tensor): Tensor of feature of dimension (b, c, n_frames, n_fft // 2)
+        
+        Returns:
+            torch.Tensor: Tensor of feature of dimension (b, growth_rate, n_frames, n_fft // 2)
+        """
+        batch, channels, n_frames, frequency_bins = x.shape
+        x_cat = x
+        for i, norm_conv_act in enumerate(self.norm_conv_act_stack):
+            x = norm_conv_act(x_cat)
+            if i != len(self.norm_conv_act_stack) - 1:
+                x_cat = torch.cat([x_cat, x], dim=1)
+        return x
+    
+    def _check_init(self, in_channels, growth_rate, num_layers, kernel_size, activation, bias):
+        if num_layers <= 0:
+            raise ValueError("The number of layers must be greater than 0.")
+        if growth_rate <= 0:
+            raise ValueError("The growth rate must be greater than 0.")
+        if kernel_size[0] <= 0 or kernel_size[1] <= 0:
+            raise ValueError("The kernel size must be greater than 0.")
+        if kernel_size[0] % 2 != 1 or kernel_size[1] % 2 != 1:
+            raise ValueError("The kernel size must be odd to keep input freq dim and output freq dim identical.") 
