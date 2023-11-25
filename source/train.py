@@ -37,6 +37,7 @@ def train(args, unmix, encoder, device, train_sampler, optimizer):
         X = encoder(x)
         Y_hat = unmix(X)
         Y = encoder(y)
+        Y = Y[:, :, :Y_hat.shape[2], :] # crop to predicted size
         loss = torch.nn.functional.mse_loss(Y_hat, Y)
         loss.backward()
         optimizer.step()
@@ -54,6 +55,7 @@ def valid(args, unmix, encoder, device, valid_sampler):
             X = encoder(x)
             Y_hat = unmix(X)
             Y = encoder(y)
+            Y = Y[:, :, :Y_hat.shape[2], :] # crop to predicted size
             loss = torch.nn.functional.mse_loss(Y_hat, Y)
             losses.update(loss.item(), Y.size(1))
         return losses.avg
@@ -163,7 +165,7 @@ def main():
     parser.add_argument(
         "--seq-dur",
         type=float,
-        default=4.46,
+        default=3,
         help="Sequence duration in seconds"
         "value of <=0.0 will use full/variable length",
     )
@@ -174,7 +176,7 @@ def main():
         help="Use unidirectional LSTM",
     )
     parser.add_argument(
-        "--nfft", type=int, default=4096, help="STFT fft size and window size"
+        "--nfft", type=int, default=2048, help="STFT fft size and window size"
     )
     parser.add_argument("--nhop", type=int, default=1024, help="STFT hop size")
     parser.add_argument(
@@ -223,7 +225,7 @@ def main():
 
     args, _ = parser.parse_known_args()
 
-    args.root = Path(DATASETS_ROOT_DIR) / "musdb18hq"
+    args.root = os.path.join(DATASETS_ROOT_DIR, 'musdb18hq')
 
     device = (
         "cuda" if torch.cuda.is_available() else
@@ -303,7 +305,7 @@ def main():
         unmix = TFC_TDF_UNet_v1(
             num_channels=args.nb_channels,
             unet_depth=3,
-            tfc_tdf_interal_layers=2,
+            tfc_tdf_interal_layers=1,
             growth_rate=24,
             kernel_size=(3, 3),
             frequency_bins=args.nfft // 2,

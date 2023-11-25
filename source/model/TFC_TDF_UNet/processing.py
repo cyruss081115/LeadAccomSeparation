@@ -40,14 +40,14 @@ class STFTProcessing(Processing):
         spec = torch.view_as_real(spec) # [batch * channel, n_fft, n_frames, 2]
         spec = einops.rearrange(
             spec, "(b c) f t r-> b (r c) t f", b=batch, c=channel) # split b,c and concat real and imaginary parts
-        return spec[..., :n_samples//self.hop_length, :self.n_fft // 2]
+        return spec[..., :self.n_fft // 2]
 
     def postprocess(self, feature: torch.Tensor) -> torch.Tensor:
         r"""
         Apply inverse STFT to a c-channeled feature, and return the result.
 
         Note:
-            The feature must be of dimension (b, 2 * c, n_fft // 2, n_frames). It will padded with zeros to match the
+            The feature must be of dimension (b, 2 * c, n_frames, n_fft // 2). It will padded with zeros to match the
             frequency dimension requirements by `torch.istft`.
             The output number of samples may return a shorter signal than the original waveform due to `torch.istft`
 

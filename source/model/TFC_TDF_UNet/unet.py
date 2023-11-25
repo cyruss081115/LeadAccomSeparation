@@ -100,21 +100,19 @@ class TFC_TDF_UNet_v1(nn.Module):
         Returns:
             torch.Tensor: Tensor of  dimension (batch, channel, time, freq)
         """
-        print(x.shape)
         x = self.in_conv(x)
         x = self.relu(x)
 
         skip_connections = []
         for down_block in self.down_blocks:
             x = down_block(x)
-            print(x.shape)
             skip_connections.append(x)
 
         x = self.mid_block(x)
 
         for up_block, skip_connection in zip(self.up_blocks, reversed(skip_connections)):
-            # print(x.shape)
-            x = torch.cat([x, skip_connection], dim=1)
+            cropped_skip_connection= skip_connection[:, :, :x.shape[2], :]
+            x = torch.cat([x, cropped_skip_connection], dim=1)
             x = up_block(x)
 
         x = self.out_conv(x)
