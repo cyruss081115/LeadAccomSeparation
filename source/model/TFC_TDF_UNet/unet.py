@@ -93,24 +93,27 @@ class TFC_TDF_UNet_v1(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         r"""
         Forward pass of the TFC-TDF UNet
-        
+
         Args:
             x (torch.Tensor): Tensor of dimension (batch, channel, time, freq)
 
         Returns:
             torch.Tensor: Tensor of  dimension (batch, channel, time, freq)
         """
+        print(x.shape)
         x = self.in_conv(x)
         x = self.relu(x)
 
         skip_connections = []
         for down_block in self.down_blocks:
             x = down_block(x)
+            print(x.shape)
             skip_connections.append(x)
 
         x = self.mid_block(x)
 
         for up_block, skip_connection in zip(self.up_blocks, reversed(skip_connections)):
+            # print(x.shape)
             x = torch.cat([x, skip_connection], dim=1)
             x = up_block(x)
 
@@ -140,3 +143,6 @@ class TFC_TDF_UNet_v1(nn.Module):
             raise ValueError("bottleneck must be divisible by 2 ** unet_depth")
         if frequency_bins % (2 ** unet_depth) != 0:
             raise ValueError("frequency_bins must be divisible by 2 ** unet_depth")
+
+
+__all__ = ['TFC_TDF_UNet_v1']

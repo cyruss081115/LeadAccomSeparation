@@ -8,22 +8,22 @@ import torch
 
 class TestSTFTProcessing(unittest.TestCase):
     def test_preprocess_output_dims(self):
-        stft_processing = STFTProcessing(n_fft=2048, hop_length=1024)
+        stft_processing = STFTProcessing(n_fft=2048, hop_length=1024, device='cpu')
         waveform = torch.rand([1, 2, 44100]) # [batch, channel, n_samples]
         spec = stft_processing.preprocess(waveform)
-        expected_shape = [1, 4, 1024, 44] # [batch, 2 * channel, n_fft // 2, 1+ n_samples // hop_length]
+        expected_shape = [1, 4, 44, 1024] # [batch, 2 * channel, 1+ n_samples // hop_length, n_fft // 2]
         self.assertEqual(list(spec.shape), expected_shape)
     
     def test_preprocess_output_dims_batch(self):
-        stft_processing = STFTProcessing(n_fft=2048, hop_length=1024)
+        stft_processing = STFTProcessing(n_fft=2048, hop_length=1024, device='cpu')
         waveform = torch.rand([3, 2, 44100])
         spec = stft_processing.preprocess(waveform)
-        expected_shape = [3, 4, 1024, 44]
+        expected_shape = [3, 4, 44, 1024]
         self.assertEqual(list(spec.shape), expected_shape)
 
     def test_postprocess_output_dims(self):
-        stft_processing = STFTProcessing(n_fft=2048, hop_length=1024)
-        spec = torch.rand([1, 4, 1024, 44])
+        stft_processing = STFTProcessing(n_fft=2048, hop_length=1024, device='cpu')
+        spec = torch.rand([1, 4, 44, 1024])
         waveform = stft_processing.postprocess(spec)
         expected_shape = [1, 2, 44100]
 

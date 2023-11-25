@@ -15,10 +15,11 @@ class Processing(ABC):
         pass
 
 class STFTProcessing(Processing):
-    def __init__(self, n_fft: int, hop_length: int):
+    def __init__(self, n_fft: int, hop_length: int, device: torch.device):
         self.n_fft = n_fft
         self.hop_length = hop_length
-        self.window = torch.hann_window(window_length=n_fft, periodic=True)
+        self.window = torch.hann_window(window_length=n_fft, periodic=True).to(device)
+        self.device = device
 
     def preprocess(self, waveform: torch.Tensor) -> torch.Tensor:
         r"""
@@ -28,18 +29,18 @@ class STFTProcessing(Processing):
             waveform (torch.Tensor): Tensor of audio of dimension (b, c, n_samples)
 
         Returns:
-            torch.Tensor: Tensor of dimension (b, 2 * c, n_fft // 2, n_frames)
+            torch.Tensor: Tensor of dimension (b, 2 * c, n_frames, n_fft // 2)
         """
         assert waveform.dim() == 3, "The input waveform must be of dimension (b, c, n_samples)."
 
-        batch, channel, _ = waveform.shape
+        batch, channel, n_samples = waveform.shape
         waveform = einops.rearrange(waveform, 'b c n -> (b c) n')
         spec = torch.stft(
             waveform, n_fft=self.n_fft, hop_length=self.hop_length, window=self.window, center=True, return_complex=True)
         spec = torch.view_as_real(spec) # [batch * channel, n_fft, n_frames, 2]
         spec = einops.rearrange(
-            spec, "(b c) f t r-> b (r c) f t", b=batch, c=channel) # split b,c and concat real and imaginary parts
-        return spec[..., :self.n_fft // 2, :]
+            spec, "(b c) f t r-> b (r c) t f", b=batch, c=channel) # split b,c and concat real and imaginary parts
+        return spec[..., :n_samples//self.hop_length, :self.n_fft // 2]
 
     def postprocess(self, feature: torch.Tensor) -> torch.Tensor:
         r"""
@@ -51,15 +52,16 @@ class STFTProcessing(Processing):
             The output number of samples may return a shorter signal than the original waveform due to `torch.istft`
 
         Args:
-            feature (torch.Tensor): Tensor of feature of dimension (b, 2 * c, n_fft // 2, n_frames)
+            feature (torch.Tensor): Tensor of feature of dimension (b, 2 * c, n_frames, n_fft // 2)
             
         Returns:
             torch.Tensor: Tensor of dimension (b, c, n_samples).
         """
-        assert feature.dim() == 4, "The input feature must be of dimension (b, 2 * c, n_fft, n_frames)."
+        assert feature.dim() == 4, "The input feature must be of dimension (b, 2 * c, n_frames, n_fft // 2)."
+        assert feature.shape[-1] == self.n_fft // 2, "The last dimension of the input feature must be n_fft // 2."
 
         b, _, _, _ = feature.shape
-        feature = einops.rearrange(feature, 'b (r c) f t -> (b c) f t r', r=2)
+        feature = einops.rearrange(feature, 'b (r c) t f -> (b c) f t r', r=2)
         feature = feature.contiguous()
 
         # pad freq dimension to match dim required by one sided torch.istft

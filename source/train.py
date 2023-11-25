@@ -21,6 +21,8 @@ from openunmix import model
 from openunmix import utils
 from openunmix import transforms
 
+from model.TFC_TDF_UNet import TFC_TDF_UNet_v1, STFTProcessing
+
 tqdm.monitor_interval = 0
 
 
@@ -58,7 +60,7 @@ def valid(args, unmix, encoder, device, valid_sampler):
 
 
 def get_statistics(args, encoder, dataset):
-    encoder = copy.deepcopy(encoder).to("cpu")
+    # encoder = copy.deepcopy(encoder).to("cpu")
     scaler = sklearn.preprocessing.StandardScaler()
 
     dataset_scaler = copy.deepcopy(dataset)
@@ -161,7 +163,7 @@ def main():
     parser.add_argument(
         "--seq-dur",
         type=float,
-        default=6.0,
+        default=4.46,
         help="Sequence duration in seconds"
         "value of <=0.0 will use full/variable length",
     )
@@ -187,7 +189,7 @@ def main():
     parser.add_argument(
         "--nb-channels",
         type=int,
-        default=2,
+        default=4,
         help="set number of channels for model (1, 2)",
     )
     parser.add_argument(
@@ -198,6 +200,9 @@ def main():
         action="store_true",
         default=False,
         help="Speed up training init for dev purposes",
+    )
+    parser.add_argument(
+        "--use-unet-stft", action="store_true", default=True, help="Use UNet STFT processing"
     )
 
     # Misc Parameters
@@ -220,17 +225,19 @@ def main():
 
     args.root = Path(DATASETS_ROOT_DIR) / "musdb18hq"
 
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
-    print("Using GPU:", use_cuda)
+    device = (
+        "cuda" if torch.cuda.is_available() else
+        "mps" if torch.backends.mps.is_available() else
+        "cpu"
+    )
+    print("Using GPU:", device)
     dataloader_kwargs = (
-        {"num_workers": args.nb_workers, "pin_memory": True} if use_cuda else {}
+        {"num_workers": args.nb_workers, "pin_memory": True} if device == 'cuda' else {}
     )
 
     # use jpg or npy
     torch.manual_seed(args.seed)
     random.seed(args.seed)
-
-    device = torch.device("cuda" if use_cuda else "cpu")
 
     train_dataset, valid_dataset, args = data.load_datasets(args)
 
@@ -245,12 +252,16 @@ def main():
         valid_dataset, batch_size=1, **dataloader_kwargs
     )
 
-    stft, _ = transforms.make_filterbanks(
-        n_fft=args.nfft, n_hop=args.nhop, sample_rate=train_dataset.sample_rate
-    )
-    encoder = torch.nn.Sequential(
-        stft, model.ComplexNorm(mono=args.nb_channels == 1)
-    ).to(device)
+    if args.use_unet_stft:
+        stft_processing = STFTProcessing(n_fft=args.nfft, hop_length=args.nhop, device=device)
+        encoder = stft_processing.preprocess
+    else:
+        stft, _ = transforms.make_filterbanks(
+            n_fft=args.nfft, n_hop=args.nhop, sample_rate=train_dataset.sample_rate
+        )
+        encoder = torch.nn.Sequential(
+            stft, model.ComplexNorm(mono=args.nb_channels == 1)
+        ).to(device)
 
     separator_conf = {
         "nfft": args.nfft,
@@ -262,15 +273,15 @@ def main():
     with open(Path(target_path, "separator.json"), "w") as outfile:
         outfile.write(json.dumps(separator_conf, indent=4, sort_keys=True))
 
-    if args.checkpoint or args.model or args.debug:
-        scaler_mean = None
-        scaler_std = None
-    else:
-        scaler_mean, scaler_std = get_statistics(args, encoder, train_dataset)
+    # if args.checkpoint or args.model or args.debug:
+    #     scaler_mean = None
+    #     scaler_std = None
+    # else:
+    #     scaler_mean, scaler_std = get_statistics(args, encoder, train_dataset)
 
-    max_bin = utils.bandwidth_to_max_bin(
-        train_dataset.sample_rate, args.nfft, args.bandwidth
-    )
+    # max_bin = utils.bandwidth_to_max_bin(
+    #     train_dataset.sample_rate, args.nfft, args.bandwidth
+    # )
 
     if args.model:
         # fine tune model
@@ -280,14 +291,25 @@ def main():
         )[args.target]
         unmix = unmix.to(device)
     else:
-        unmix = model.OpenUnmix(
-            input_mean=scaler_mean,
-            input_scale=scaler_std,
-            nb_bins=args.nfft // 2 + 1,
-            nb_channels=args.nb_channels,
-            hidden_size=args.hidden_size,
-            max_bin=max_bin,
-            unidirectional=args.unidirectional,
+        # unmix = model.OpenUnmix(
+        #     input_mean=scaler_mean,
+        #     input_scale=scaler_std,
+        #     nb_bins=args.nfft // 2 + 1,
+        #     nb_channels=args.nb_channels,
+        #     hidden_size=args.hidden_size,
+        #     max_bin=max_bin,
+        #     unidirectional=args.unidirectional,
+        # ).to(device)
+        unmix = TFC_TDF_UNet_v1(
+            num_channels=args.nb_channels,
+            unet_depth=3,
+            tfc_tdf_interal_layers=2,
+            growth_rate=24,
+            kernel_size=(3, 3),
+            frequency_bins=args.nfft // 2,
+            bottleneck=args.nfft // 16,
+            activation="ReLU",
+            bias=False
         ).to(device)
 
     optimizer = torch.optim.Adam(
