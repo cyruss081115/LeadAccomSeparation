@@ -1,3 +1,10 @@
+"""
+Usage:
+
+accelerate launch --multi_gpu scripts/train_accelerate.py
+"""
+
+
 import sys, os
 
 sys.path.append(os.getcwd())
@@ -15,45 +22,45 @@ import random
 import os
 import copy
 import torchaudio
+from accelerate import Accelerator
 
 from openunmix import data
 from openunmix import model
 from openunmix import utils
 from openunmix import transforms
 
-from model.TFC_TDF_UNet import TFC_TDF_UNet_v1, STFTProcessing
+from source.model.TFC_TDF_UNet import TFC_TDF_UNet_v1, STFTProcessing
 
 tqdm.monitor_interval = 0
 
 
-def train(args, unmix, encoder, device, train_sampler, optimizer):
+def train(args, model, encoder, device, train_sampler, optimizer, accelerator):
     losses = utils.AverageMeter()
-    unmix.train()
+    model.train()
     pbar = tqdm.tqdm(train_sampler, disable=args.quiet)
     for x, y in pbar:
         pbar.set_description("Training batch")
-        x, y = x.to(device), y.to(device)
         optimizer.zero_grad()
         X = encoder(x)
-        Y_hat = unmix(X)
+        Y_hat = model(X)
         Y = encoder(y)
         Y = Y[:, :, :Y_hat.shape[2], :] # crop to predicted size
         loss = torch.nn.functional.mse_loss(Y_hat, Y)
-        loss.backward()
+        accelerator.backward(loss)
         optimizer.step()
         losses.update(loss.item(), Y.size(1))
         pbar.set_postfix(loss="{:.3f}".format(losses.avg))
     return losses.avg
 
 
-def valid(args, unmix, encoder, device, valid_sampler):
+def valid(args, model, encoder, device, valid_sampler):
     losses = utils.AverageMeter()
-    unmix.eval()
+    model.eval()
     with torch.no_grad():
         for x, y in valid_sampler:
             x, y = x.to(device), y.to(device)
             X = encoder(x)
-            Y_hat = unmix(X)
+            Y_hat = model(X)
             Y = encoder(y)
             Y = Y[:, :, :Y_hat.shape[2], :] # crop to predicted size
             loss = torch.nn.functional.mse_loss(Y_hat, Y)
@@ -227,11 +234,9 @@ def main():
 
     args.root = os.path.join(DATASETS_ROOT_DIR, 'musdb18hq')
 
-    device = (
-        "cuda" if torch.cuda.is_available() else
-        "mps" if torch.backends.mps.is_available() else
-        "cpu"
-    )
+    accelerator = Accelerator()
+
+    device = accelerator.device
     print("Using GPU:", device)
     dataloader_kwargs = (
         {"num_workers": args.nb_workers, "pin_memory": True} if device == 'cuda' else {}
@@ -288,12 +293,12 @@ def main():
     if args.model:
         # fine tune model
         print(f"Fine-tuning model from {args.model}")
-        unmix = utils.load_target_models(
+        model = utils.load_target_models(
             args.target, model_str_or_path=args.model, device=device, pretrained=True
         )[args.target]
-        unmix = unmix.to(device)
+        model = model.to(device)
     else:
-        # unmix = model.OpenUnmix(
+        # model = model.OpenUnmix(
         #     input_mean=scaler_mean,
         #     input_scale=scaler_std,
         #     nb_bins=args.nfft // 2 + 1,
@@ -302,7 +307,7 @@ def main():
         #     max_bin=max_bin,
         #     unidirectional=args.unidirectional,
         # ).to(device)
-        unmix = TFC_TDF_UNet_v1(
+        model = TFC_TDF_UNet_v1(
             num_channels=args.nb_channels,
             unet_depth=3,
             tfc_tdf_interal_layers=1,
@@ -315,7 +320,7 @@ def main():
         ).to(device)
 
     optimizer = torch.optim.Adam(
-        unmix.parameters(), lr=args.lr, weight_decay=args.weight_decay
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
     )
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -327,6 +332,10 @@ def main():
 
     es = utils.EarlyStopping(patience=args.patience)
 
+    model, optimizer, train_sampler, valid_sampler, scheduler = accelerator.prepare(
+        model, optimizer, train_sampler, valid_sampler, scheduler
+    )
+
     # if a checkpoint is specified: resume training
     if args.checkpoint:
         model_path = Path(args.checkpoint).expanduser()
@@ -335,7 +344,7 @@ def main():
 
         target_model_path = Path(model_path, args.target + ".chkpnt")
         checkpoint = torch.load(target_model_path, map_location=device)
-        unmix.load_state_dict(checkpoint["state_dict"], strict=False)
+        model.load_state_dict(checkpoint["state_dict"], strict=False)
         optimizer.load_state_dict(checkpoint["optimizer"])
         scheduler.load_state_dict(checkpoint["scheduler"])
         # train for another epochs_trained
@@ -361,8 +370,8 @@ def main():
     for epoch in t:
         t.set_description("Training epoch")
         end = time.time()
-        train_loss = train(args, unmix, encoder, device, train_sampler, optimizer)
-        valid_loss = valid(args, unmix, encoder, device, valid_sampler)
+        train_loss = train(args, model, encoder, device, train_sampler, optimizer, accelerator)
+        valid_loss = valid(args, model, encoder, device, valid_sampler)
         scheduler.step(valid_loss)
         train_losses.append(train_loss)
         valid_losses.append(valid_loss)
@@ -377,7 +386,7 @@ def main():
         utils.save_checkpoint(
             {
                 "epoch": epoch + 1,
-                "state_dict": unmix.state_dict(),
+                "state_dict": model.state_dict(),
                 "best_loss": es.best,
                 "optimizer": optimizer.state_dict(),
                 "scheduler": scheduler.state_dict(),
