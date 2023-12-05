@@ -1,4 +1,3 @@
-from abc import ABC
 from typing import List, Tuple
 
 import torch
@@ -9,16 +8,14 @@ from ..unetBlock import UNetBlock
 from ..basicBlocks import (
     BasicBlock,
     TimeFrequencyConvolutionBlock,
-    TimeDistributedFullyConnectedBlock,
+    TimeDistributedSelfAttentionBlock,
     DownSample2DBlock,
     UpSample2DBlock
 )
 
-
-
-class TFC_TDF_v1(UNetBlock):
+class TFC_TDSA(UNetBlock):
     r"""
-    TFC-TDF intermediate block as described in:
+    Time Frequency Convolution + Time Distributed Self Attention, using a similar architecture as TFC-TDF described in:
     `Investigating U-Nets with various Intermediate Blocks for Spectrogram-based Singing Voice Separation`,
     arxiv: https://arxiv.org/abs/1912.02591
 
@@ -27,22 +24,22 @@ class TFC_TDF_v1(UNetBlock):
         num_layers (int): Number of layers in each block
         growth_rate (int): Number of channels to add per layer, also the output of this block
         kernel_size (Tuple[int, int]): Size of the convolutional kernel
-        frequency_bins (int): Number of frequency bins in the input
-        bottleneck (int): Number of channels in the bottleneck layer
+        num_attention_heads (int): Number of attention heads
         activation (str, optional): Activation function to use. Defaults to "ReLU".
-        bias (bool, optional): Whether to use bias in the convolutional layers. Defaults to False.
+        bias (bool, optional): Whether to use bias. Defaults to False.
     """
+
     def __init__(self,
                  in_channels: int,
                  num_layers: int,
                  growth_rate: int,
                  kernel_size: Tuple[int, int],
                  frequency_bins: int,
-                 bottleneck: int,
+                 num_attention_heads: int,
                  activation: str = "ReLU",
                  bias: bool = False
         ):
-        super(TFC_TDF_v1, self).__init__()
+        super(TFC_TDSA, self).__init__()
         self.tfc_block = TimeFrequencyConvolutionBlock(
             in_channels=in_channels,
             growth_rate=growth_rate,
@@ -51,93 +48,97 @@ class TFC_TDF_v1(UNetBlock):
             activation=activation,
             bias=bias
         )
-        self.tdf_block = TimeDistributedFullyConnectedBlock(
-            channels=growth_rate,
-            frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+        self.tdsa_block = TimeDistributedSelfAttentionBlock(
+            embed_dim=frequency_bins,
+            num_heads=num_attention_heads,
             num_layers=num_layers,
             activation=activation,
             bias=bias
         )
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.tfc_block(x)
-        return x + self.tdf_block(x)
+        return x + self.tdsa_block(x)
 
 
-class TFC_TDF_v1_DownSample(UNetBlock):
+class TFC_TDSA_DownSample(UNetBlock):
     r"""
-    TFC-TDF intermediate block as described in:
+    Downsample block using Time Frequency Convolution + Time Distributed Self Attention, using a similar architecture as TFC-TDF described in:
     `Investigating U-Nets with various Intermediate Blocks for Spectrogram-based Singing Voice Separation`,
     arxiv: https://arxiv.org/abs/1912.02591
+
+    Args:
+        in_channels (int): Number of input channels
+        num_layers (int): Number of layers in each block
+        growth_rate (int): Number of channels to add per layer, also the output of this block
+        kernel_size (Tuple[int, int]): Size of the convolutional kernel
+        num_attention_heads (int): Number of attention heads
+        activation (str, optional): Activation function to use. Defaults to "ReLU".
+        bias (bool, optional): Whether to use bias. Defaults to False.
     """
+
     def __init__(self,
                  in_channels: int,
                  num_layers: int,
                  growth_rate: int,
                  kernel_size: Tuple[int, int],
                  frequency_bins: int,
-                 bottleneck: int,
+                 num_attention_heads: int,
                  activation: str = "ReLU",
                  bias: bool = False
         ):
-        super(TFC_TDF_v1_DownSample, self).__init__()
-        self.tfc_tdf_block = TFC_TDF_v1(
+        super(TFC_TDSA_DownSample, self).__init__()
+        self.tfc_tdsa_block = TFC_TDSA(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+            num_attention_heads=num_attention_heads,
             activation=activation,
             bias=bias
         )
-        self.downsample = DownSample2DBlock(
+        self.downsample_block = DownSample2DBlock(
             in_channels=growth_rate,
             out_channels=growth_rate,
             activation=activation,
             bias=bias
         )
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.tfc_tdf_block(x)
-        return self.downsample(x)
+        x = self.tfc_tdsa_block(x)
+        return self.downsample_block(x)
 
 
-class TFC_TDF_v1_UpSample(UNetBlock):
-    r"""
-    TFC-TDF intermediate block as described in:
-    `Investigating U-Nets with various Intermediate Blocks for Spectrogram-based Singing Voice Separation`,
-    arxiv: https://arxiv.org/abs/1912.02591
-    """
+class TFC_TDSA_UpSample(UNetBlock):
     def __init__(self,
                  in_channels: int,
                  num_layers: int,
                  growth_rate: int,
                  kernel_size: Tuple[int, int],
                  frequency_bins: int,
-                 bottleneck: int,
+                 num_attention_heads: int,
                  activation: str = "ReLU",
                  bias: bool = False
         ):
-        super(TFC_TDF_v1_UpSample, self).__init__()
-        self.tfc_tdf_block = TFC_TDF_v1(
+        super(TFC_TDSA_UpSample, self).__init__()
+        self.tfc_tdsa_block = TFC_TDSA(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+            num_attention_heads=num_attention_heads,
             activation=activation,
             bias=bias
         )
-        self.upsample = UpSample2DBlock(
+        self.upsample_block = UpSample2DBlock(
             in_channels=growth_rate,
             out_channels=growth_rate,
             activation=activation,
             bias=bias
         )
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.tfc_tdf_block(x)
-        return self.upsample(x)
+        x = self.tfc_tdsa_block(x)
+        return self.upsample_block(x)

@@ -223,6 +223,9 @@ class TimeDistributedSelfAttentionBlock(BasicBlock):
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        r"""
+        [batch, channels, n_frames, embed_dim] -> [batch, channels, n_frames, embed_dim]
+        """
         batch, channels, n_frames, frequency_bins = x.shape
         x = einops.rearrange(x, 'b c t f -> (b t c) f')
         identity = x
