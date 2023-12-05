@@ -6,13 +6,13 @@ import unittest
 import torch
 import torch.nn as nn
 
-from source.model.TFC_TDF_UNet.basicBlocks import (
+from source.model.basicBlocks import (
     TimeFrequencyConvolutionBlock,
     TimeDistributedFullyConnectedBlock,
     DownSample2DBlock,
     UpSample2DBlock,
 )
-from source.model.TFC_TDF_UNet.unetBlocks import (
+from source.model.TFC_TDF_UNet.buildingBlocks import (
     TFC_TDF_v1,
     TFC_TDF_v1_DownSample,
     TFC_TDF_v1_UpSample,

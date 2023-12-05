@@ -3,7 +3,7 @@ sys.path.append(os.getcwd())
 
 import torch
 import torchaudio
-from source.model.TFC_TDF_UNet.processing import STFTProcessing
+from source.model.processing import STFTProcessing
 from source.utils.path_utils import DATASETS_ROOT_DIR, OUTPUT_DIR
 from source.utils.audio_utils import plot_spectrogram
 

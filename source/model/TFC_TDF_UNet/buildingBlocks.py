@@ -5,7 +5,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .basicBlocks import (
+from ..unetBlock import UnetBlock
+from ..basicBlocks import (
     BasicBlock,
     TimeFrequencyConvolutionBlock,
     TimeDistributedFullyConnectedBlock,
@@ -13,14 +14,6 @@ from .basicBlocks import (
     UpSample2DBlock
 )
 
-
-class UnetBlock(nn.Module, ABC):
-    def __init__(self):
-        super(UnetBlock, self).__init__()
-        pass
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        pass
 
 
 class TFC_TDF_v1(UnetBlock):

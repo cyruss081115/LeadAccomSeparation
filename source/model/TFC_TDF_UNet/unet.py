@@ -3,7 +3,7 @@ from typing import Tuple
 import torch
 import torch.nn as nn
 
-from .unetBlocks import TFC_TDF_v1, TFC_TDF_v1_DownSample, TFC_TDF_v1_UpSample
+from .buildingBlocks import TFC_TDF_v1, TFC_TDF_v1_DownSample, TFC_TDF_v1_UpSample
 
 class TFC_TDF_UNet_v1(nn.Module):
     r"""

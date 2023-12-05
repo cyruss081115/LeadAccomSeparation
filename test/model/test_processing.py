@@ -1,7 +1,7 @@
 import sys, os
 sys.path.append(os.getcwd())
 
-from source.model.TFC_TDF_UNet.processing import STFTProcessing
+from source.model.processing import STFTProcessing
 import unittest
 import torch
 
