@@ -29,7 +29,9 @@ from openunmix import model
 from openunmix import utils
 from openunmix import transforms
 
-from source.model.TFC_TDF_UNet import TFC_TDF_UNet_v1, STFTProcessing
+from source.model.TFC_TDF_UNet import TFC_TDF_UNet_v1
+from source.model.TFC_TDSA_UNet import TFC_TDSA_UNet
+from source.model.processing import STFTProcessing
 
 tqdm.monitor_interval = 0
 
@@ -307,14 +309,25 @@ def main():
         #     max_bin=max_bin,
         #     unidirectional=args.unidirectional,
         # ).to(device)
-        model = TFC_TDF_UNet_v1(
+        # model = TFC_TDF_UNet_v1(
+        #     num_channels=args.nb_channels,
+        #     unet_depth=3,
+        #     tfc_tdf_interal_layers=1,
+        #     growth_rate=24,
+        #     kernel_size=(3, 3),
+        #     frequency_bins=args.nfft // 2,
+        #     bottleneck=args.nfft // 16,
+        #     activation="ReLU",
+        #     bias=False
+        # ).to(device)
+        model = TFC_TDSA_UNet(
             num_channels=args.nb_channels,
             unet_depth=3,
-            tfc_tdf_interal_layers=1,
+            tfc_tdsa_internal_layers=1,
             growth_rate=24,
             kernel_size=(3, 3),
             frequency_bins=args.nfft // 2,
-            bottleneck=args.nfft // 16,
+            num_attention_heads=8,
             activation="ReLU",
             bias=False
         ).to(device)

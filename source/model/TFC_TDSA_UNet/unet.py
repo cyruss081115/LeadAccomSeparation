@@ -18,7 +18,7 @@ class TFC_TDSA_UNet(nn.Module):
     def __init__(self,
                  num_channels: int = 4,
                  unet_depth: int = 3,
-                 tfc_tdsa_interal_layers: int = 2,
+                 tfc_tdsa_internal_layers: int = 2,
                  growth_rate: int = 24,
                  kernel_size: Tuple[int, int] = (3, 3),
                  frequency_bins: int = 1024, # n_fft = 2048
@@ -27,7 +27,7 @@ class TFC_TDSA_UNet(nn.Module):
                  bias: bool = False
         ):
         super(TFC_TDSA_UNet, self).__init__()
-        self._check_init(num_channels, unet_depth, tfc_tdsa_interal_layers, growth_rate, kernel_size, frequency_bins, num_attention_heads, activation, bias)
+        self._check_init(num_channels, unet_depth, tfc_tdsa_internal_layers, growth_rate, kernel_size, frequency_bins, num_attention_heads, activation, bias)
 
         self.in_conv = nn.Conv2d(num_channels, growth_rate, kernel_size=(1, 3), padding=(0, 1), stride=1)
         self.relu = nn.ReLU()
@@ -39,7 +39,7 @@ class TFC_TDSA_UNet(nn.Module):
             self.down_blocks.append(
                 TFC_TDSA_DownSample(
                     in_channels=growth_rate,
-                    num_layers=tfc_tdsa_interal_layers,
+                    num_layers=tfc_tdsa_internal_layers,
                     growth_rate=growth_rate,
                     kernel_size=kernel_size,
                     frequency_bins=blk_freq_bin_dim,
@@ -51,7 +51,7 @@ class TFC_TDSA_UNet(nn.Module):
 
         self.mid_block = TFC_TDSA(
             in_channels=growth_rate,
-            num_layers=tfc_tdsa_interal_layers,
+            num_layers=tfc_tdsa_internal_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=block_freq_bin_dimensions[-1],
@@ -65,7 +65,7 @@ class TFC_TDSA_UNet(nn.Module):
             self.up_blocks.append(
                 TFC_TDSA_UpSample(
                     in_channels=2*growth_rate,
-                    num_layers=tfc_tdsa_interal_layers,
+                    num_layers=tfc_tdsa_internal_layers,
                     growth_rate=growth_rate,
                     kernel_size=kernel_size,
                     frequency_bins=blk_freq_bin_dim,
@@ -128,4 +128,4 @@ class TFC_TDSA_UNet(nn.Module):
             raise ValueError("frequency_bins must be divisible by 2 ** unet_depth")
 
 
-__all__ = ['TFC_TDF_UNet_v1']
+__all__ = ['TFC_TDSA_UNet']

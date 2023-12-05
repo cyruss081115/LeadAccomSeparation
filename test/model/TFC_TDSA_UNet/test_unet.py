@@ -28,7 +28,7 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
         unet = TFC_TDSA_UNet(
             num_channels=num_channels,
             unet_depth=unet_depth,
-            tfc_tdsa_interal_layers=num_layers,
+            tfc_tdsa_internal_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
@@ -53,7 +53,7 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
         unet = TFC_TDSA_UNet(
             num_channels=num_channels,
             unet_depth=unet_depth,
-            tfc_tdsa_interal_layers=num_layers,
+            tfc_tdsa_internal_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
@@ -138,7 +138,7 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
         unet = TFC_TDSA_UNet(
             num_channels=num_channels,
             unet_depth=unet_depth,
-            tfc_tdsa_interal_layers=num_layers,
+            tfc_tdsa_internal_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
