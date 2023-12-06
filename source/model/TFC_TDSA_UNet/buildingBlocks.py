@@ -36,6 +36,7 @@ class TFC_TDSA(UNetBlock):
                  kernel_size: Tuple[int, int],
                  frequency_bins: int,
                  num_attention_heads: int,
+                 use_vanilla_self_attention: bool = False,
                  activation: str = "ReLU",
                  bias: bool = False
         ):
@@ -53,6 +54,7 @@ class TFC_TDSA(UNetBlock):
             num_heads=num_attention_heads,
             num_layers=num_layers,
             activation=activation,
+            use_vanilla_self_attention=use_vanilla_self_attention,
             bias=bias
         )
 
@@ -84,6 +86,7 @@ class TFC_TDSA_DownSample(UNetBlock):
                  kernel_size: Tuple[int, int],
                  frequency_bins: int,
                  num_attention_heads: int,
+                 use_vanilla_self_attention: bool = False,
                  activation: str = "ReLU",
                  bias: bool = False
         ):
@@ -95,6 +98,7 @@ class TFC_TDSA_DownSample(UNetBlock):
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
             num_attention_heads=num_attention_heads,
+            use_vanilla_self_attention=use_vanilla_self_attention,
             activation=activation,
             bias=bias
         )
@@ -118,6 +122,7 @@ class TFC_TDSA_UpSample(UNetBlock):
                  kernel_size: Tuple[int, int],
                  frequency_bins: int,
                  num_attention_heads: int,
+                 use_vanilla_self_attention: bool = False,
                  activation: str = "ReLU",
                  bias: bool = False
         ):
@@ -129,6 +134,7 @@ class TFC_TDSA_UpSample(UNetBlock):
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
             num_attention_heads=num_attention_heads,
+            use_vanilla_self_attention=use_vanilla_self_attention,
             activation=activation,
             bias=bias
         )

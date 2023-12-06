@@ -327,7 +327,8 @@ def main():
             growth_rate=24,
             kernel_size=(3, 3),
             frequency_bins=args.nfft // 2,
-            num_attention_heads=8,
+            num_attention_heads=1,
+            use_vanilla_self_attention=True,
             activation="ReLU",
             bias=False
         ).to(device)

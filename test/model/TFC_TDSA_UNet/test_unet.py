@@ -22,6 +22,7 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
         kernel_size = (3, 3)
         frequency_bins = 1024
         num_attention_heads = 8
+        use_vanilla_self_attention = False
         activation = "ReLU"
         bias = False
 
@@ -33,13 +34,14 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
             num_attention_heads=num_attention_heads,
+            use_vanilla_self_attention=use_vanilla_self_attention,
             activation=activation,
             bias=bias
         )
 
         self.assertIsInstance(unet, nn.Module)
     
-    def test_init_architecture(self):
+    def test_init_multihead_self_attention_architecture(self):
         num_channels = 2
         unet_depth = 3
         num_layers = 2

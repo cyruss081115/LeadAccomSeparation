@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .attention import SelfAttention
+
 import einops
 
 
@@ -208,16 +210,17 @@ class TimeDistributedSelfAttentionBlock(BasicBlock):
                  num_layers: int,
                  dropout: float = 0.,
                  activation: str = 'ReLU',
+                 use_vanilla_self_attention: bool = False,
                  bias: bool = False):
         super(TimeDistributedSelfAttentionBlock, self).__init__()
-        self._check_init(embed_dim, num_heads, num_layers, dropout, activation, bias)
+        self._check_init(embed_dim, num_heads, num_layers, dropout, activation, use_vanilla_self_attention, bias)
         self.norm_attn_act_stack = nn.ModuleList()
 
         for i in range(num_layers):
             self.norm_attn_act_stack.append(
                 nn.Sequential(
                     nn.BatchNorm1d(embed_dim),
-                    nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, bias=bias),
+                    SelfAttention(embed_dim) if use_vanilla_self_attention else nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, bias=bias),
                     get_activation(activation),
                 )
             )
@@ -238,7 +241,7 @@ class TimeDistributedSelfAttentionBlock(BasicBlock):
         x = x + identity
         return einops.rearrange(x, '(b t c) f -> b c t f', b=batch, t=n_frames, c=channels)
 
-    def _check_init(self, embed_dim,  num_heads, num_layers, dropout, activation, bias):
+    def _check_init(self, embed_dim,  num_heads, num_layers, dropout, activation, use_vanilla_self_attention, bias):
         if embed_dim <= 0:
             raise ValueError("The embedding dimension must be greater than 0.")
         if num_heads <= 0:
@@ -249,6 +252,8 @@ class TimeDistributedSelfAttentionBlock(BasicBlock):
             raise ValueError("The number of layers must be greater than 0.")
         if dropout < 0 or dropout > 1:
             raise ValueError("The dropout rate must be between 0 and 1.")
+        if use_vanilla_self_attention and num_heads != 1:
+            raise ValueError("Vanilla self-attention can only have one head.")
 
 
 class DownSample2DBlock(BasicBlock):

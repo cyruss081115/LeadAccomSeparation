@@ -23,6 +23,7 @@ class TFC_TDSA_UNet(nn.Module):
                  kernel_size: Tuple[int, int] = (3, 3),
                  frequency_bins: int = 1024, # n_fft = 2048
                  num_attention_heads: int = 8,
+                 use_vanilla_self_attention: bool = False,
                  activation: str = "ReLU",
                  bias: bool = False
         ):
@@ -44,6 +45,7 @@ class TFC_TDSA_UNet(nn.Module):
                     kernel_size=kernel_size,
                     frequency_bins=blk_freq_bin_dim,
                     num_attention_heads=num_attention_heads,
+                    use_vanilla_self_attention=use_vanilla_self_attention,
                     activation=activation,
                     bias=bias
                 )
@@ -56,6 +58,7 @@ class TFC_TDSA_UNet(nn.Module):
             kernel_size=kernel_size,
             frequency_bins=block_freq_bin_dimensions[-1],
             num_attention_heads=num_attention_heads,
+            use_vanilla_self_attention=use_vanilla_self_attention,
             activation=activation,
             bias=bias
         )
@@ -70,6 +73,7 @@ class TFC_TDSA_UNet(nn.Module):
                     kernel_size=kernel_size,
                     frequency_bins=blk_freq_bin_dim,
                     num_attention_heads=num_attention_heads,
+                    use_vanilla_self_attention=use_vanilla_self_attention,
                     activation=activation,
                     bias=bias
                 )
