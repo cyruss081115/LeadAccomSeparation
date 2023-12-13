@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .attention import SelfAttention
+from .attention import VanillaSelfAttention, TransformerBlock
 
 import einops
 
@@ -220,7 +220,7 @@ class TimeDistributedSelfAttentionBlock(BasicBlock):
             self.norm_attn_act_stack.append(
                 nn.Sequential(
                     nn.BatchNorm1d(embed_dim),
-                    SelfAttention(embed_dim) if use_vanilla_self_attention else nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, bias=bias),
+                    VanillaSelfAttention(embed_dim) if use_vanilla_self_attention else nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, bias=bias),
                     get_activation(activation),
                 )
             )
@@ -255,6 +255,49 @@ class TimeDistributedSelfAttentionBlock(BasicBlock):
         if use_vanilla_self_attention and num_heads != 1:
             raise ValueError("Vanilla self-attention can only have one head.")
 
+class TimeDistributedTransformerBlock(BasicBlock):
+    r"""
+    Time-distributed transformer block. It will be applied to the frequency dimension of input.
+    [batch, channels, n_frames, frequency_bins] -> [batch, channels, n_frames, frequency_bins]
+
+    Args:
+        embed_dim (int): Embedding dimension 
+        num_layers (int): Number of layers.
+        dropout (float, optional): Dropout rate. Defaults to 0.2.
+        seq_length (int, optional): Sequence length. Defaults to 1024.
+    """
+    def __init__(self,
+                 embed_dim: int,
+                 num_layers: int,
+                 dropout: float = 0.2,
+                 seq_length: int = 1024):
+        super(TimeDistributedTransformerBlock, self).__init__()
+        self._check_init(embed_dim, num_layers, dropout, seq_length)
+        self.transformer_blk_stack = nn.ModuleList()
+
+        for i in range(num_layers):
+            self.transformer_blk_stack.append(
+                TransformerBlock(embed_dim=embed_dim, dropout=dropout, seq_length=seq_length)
+            )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        r"""
+        [batch, channels, n_frames, frequency] -> [batch, channels, n_frames, frequency]
+        """
+        batch, channels, n_frames, frequency_bins = x.shape
+        x = einops.rearrange(x, 'b c t f -> (b t) f c')
+        for block in self.transformer_blk_stack:
+            x = block(x)
+        return einops.rearrange(x, '(b t) f c -> b c t f', b=batch, t=n_frames, c=channels)
+
+    def _check_init(self, embed_dim, num_layers, dropout, seq_length):
+        if embed_dim <= 0:
+            raise ValueError("The embedding dimension must be greater than 0.")
+        if num_layers <= 0:
+            raise ValueError("The number of layers must be greater than 0.")
+        if dropout < 0 or dropout > 1:
+            raise ValueError("The dropout rate must be between 0 and 1.")
+    
 
 class DownSample2DBlock(BasicBlock):
     r"""

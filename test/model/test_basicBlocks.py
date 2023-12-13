@@ -1,17 +1,21 @@
 import sys, os
 sys.path.append(os.getcwd())
 
+import unittest
+
+import torch.nn as nn
+import torch
+
+from source.model.attention import TransformerBlock
 from source.model.basicBlocks import (
     TimeDistributedFullyConnectedBlock,
     TimeDistributedConvolutionBlock,
     TimeDistributedSelfAttentionBlock,
+    TimeDistributedTransformerBlock,
     TimeFrequencyConvolutionBlock,
     DownSample2DBlock,
     UpSample2DBlock,
 )
-import torch.nn as nn
-import unittest
-import torch
 
 class TestTDFBlock(unittest.TestCase):
     def test_init_other_activation(self):
@@ -262,6 +266,64 @@ class TestTDSABlock(unittest.TestCase):
         output = tdsa_block(input)
 
         self.assertEqual(list(output.shape), [3, 4, 100, 1024])
+
+
+class TestTDTBlock(unittest.TestCase):
+    def test_init_num_layers_equals_1(self):
+        tdt_block = TimeDistributedTransformerBlock(embed_dim=1024, num_layers=1, dropout=0.2, seq_length=1024)
+        expected_architecture = nn.ModuleList([
+            TransformerBlock(embed_dim=1024, dropout=0.2, seq_length=1024)
+        ])
+        self.assertEqual(
+            tdt_block.transformer_blk_stack.__str__(),
+            expected_architecture.__str__())
+
+    def test_init_num_layers_greater_than_1(self):
+        tdt_block = TimeDistributedTransformerBlock(embed_dim=1024, num_layers=2)
+        expected_architecture = nn.ModuleList([
+            TransformerBlock(embed_dim=1024, dropout=0.2, seq_length=1024),
+            TransformerBlock(embed_dim=1024, dropout=0.2, seq_length=1024),
+        ])
+        self.assertEqual(
+            tdt_block.transformer_blk_stack.__str__(),
+            expected_architecture.__str__())
+    
+    def test_forward_num_layers_equals_1(self):
+        device = (
+            'cuda' if torch.cuda.is_available() else
+            'mps' if torch.cuda.is_available() else
+            'cpu'
+        ) 
+        tdt_block = TimeDistributedTransformerBlock(embed_dim=4, seq_length=1024, num_layers=1).to(device)
+        input = torch.rand([1, 4, 1378, 1024]).to(device)
+        output = tdt_block(input)
+
+        self.assertEqual(list(output.shape), [1, 4, 1378, 1024])
+
+    def test_forward_num_layers_greater_than_1(self):
+        device = (
+            'cuda' if torch.cuda.is_available() else
+            'mps' if torch.cuda.is_available() else
+            'cpu'
+        ) 
+        tdt_block = TimeDistributedTransformerBlock(embed_dim=4, seq_length=1024, num_layers=3).to(device)
+        input = torch.rand([1, 4, 100, 1024]).to(device) # [B, C, T, F]
+        output = tdt_block(input)
+
+        self.assertEqual(list(output.shape), [1, 4, 100, 1024])
+    
+    def test_forward_batch_larger_than_1(self):
+        device = (
+            'cuda' if torch.cuda.is_available() else
+            'mps' if torch.cuda.is_available() else
+            'cpu'
+        ) 
+        tdt_block = TimeDistributedTransformerBlock(embed_dim=4, seq_length=1024, num_layers=3).to(device)
+        input = torch.rand([3, 4, 100, 1024]).to(device) # [B, C, T, F]
+        output = tdt_block(input)
+
+        self.assertEqual(list(output.shape), [3, 4, 100, 1024])
+
 
 
 class TestDownSampleBlock(unittest.TestCase):
