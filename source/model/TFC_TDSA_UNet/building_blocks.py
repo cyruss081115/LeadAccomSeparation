@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..unetBlock import UNetBlock
-from ..basicBlocks import (
+from ..unet_blocks import UNetBlock
+from ..basic_blocks import (
     BasicBlock,
     TimeFrequencyConvolutionBlock,
     TimeDistributedSelfAttentionBlock,

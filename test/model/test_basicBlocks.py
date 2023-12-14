@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch
 
 from source.model.attention import TransformerBlock
-from source.model.basicBlocks import (
+from source.model.basic_blocks import (
     TimeDistributedFullyConnectedBlock,
     TimeDistributedConvolutionBlock,
     TimeDistributedSelfAttentionBlock,

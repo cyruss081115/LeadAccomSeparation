@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 from source.model.TFC_TDF_UNet.unet import TFC_TDF_UNet_v1
-from source.model.TFC_TDF_UNet.buildingBlocks import (
+from source.model.TFC_TDF_UNet.building_blocks import (
     TFC_TDF_v1,
     TFC_TDF_v1_DownSample,
     TFC_TDF_v1_UpSample,

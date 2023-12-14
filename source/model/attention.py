@@ -51,7 +51,7 @@ class TransformerBlock(nn.Module):
         super(TransformerBlock, self).__init__()
         self.embed_dim = embed_dim
 
-        self.positional_encoding = positional_encoding(seq_length=seq_length, embed_dim=embed_dim)
+        self.register_buffer('positional_encoding', positional_encoding(seq_length=seq_length, embed_dim=embed_dim))
         
         self.layer_norm = nn.LayerNorm(embed_dim)
         self.attention = VanillaSelfAttention(embed_dim)
@@ -65,7 +65,6 @@ class TransformerBlock(nn.Module):
         [batch, seq_length, embed_dim] -> [batch, seq_length, embed_dim]
         """
         batch, seq_length, embed_dim = x.shape
-        print(x.shape)
         x = x + self.positional_encoding[:seq_length, :].repeat(batch, 1, 1)
         x = x + self.attention(x)
         x = self.layer_norm(x)

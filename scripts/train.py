@@ -21,9 +21,8 @@ from openunmix import model
 from openunmix import utils
 from openunmix import transforms
 
-from source.model.TFC_TDF_UNet import TFC_TDF_UNet_v1
 from source.model.processing import STFTProcessing
-from source.model.TFC_TDSA_UNet import TFC_TDSA_UNet
+from source.model import TFC_TDF_UNet_v1, TFC_TDSA_UNet, TFC_TDT_UNet
 
 tqdm.monitor_interval = 0
 
@@ -313,14 +312,26 @@ def main():
         #     activation="ReLU",
         #     bias=False
         # ).to(device)
-        model = TFC_TDSA_UNet(
+        # model = TFC_TDSA_UNet(
+        #     num_channels=args.nb_channels,
+        #     unet_depth=3,
+        #     tfc_tdsa_internal_layers=1,
+        #     growth_rate=24,
+        #     kernel_size=(3, 3),
+        #     frequency_bins=args.nfft // 2,
+        #     num_attention_heads=1,
+        #     use_vanilla_self_attention=True,
+        #     activation="ReLU",
+        #     bias=False
+        # ).to(device)
+        model = TFC_TDT_UNet(
             num_channels=args.nb_channels,
             unet_depth=3,
-            tfc_tdsa_internal_layers=1,
+            tfc_tdt_internal_layers=1,
             growth_rate=24,
             kernel_size=(3, 3),
             frequency_bins=args.nfft // 2,
-            num_attention_heads=1,
+            dropout=0.2,
             activation="ReLU",
             bias=False
         ).to(device)
@@ -373,7 +384,8 @@ def main():
     for epoch in t:
         t.set_description("Training epoch")
         end = time.time()
-        train_loss = train(args, model, encoder, device, train_sampler, optimizer)
+        # train_loss = train(args, model, encoder, device, train_sampler, optimizer)
+        train_loss = 0
         valid_loss = valid(args, model, encoder, device, valid_sampler)
         scheduler.step(valid_loss)
         train_losses.append(train_loss)

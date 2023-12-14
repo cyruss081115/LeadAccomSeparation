@@ -3,11 +3,11 @@ from typing import Tuple
 import torch
 import torch.nn as nn
 
-from .building_blocks import TFC_TDSA, TFC_TDSA_DownSample, TFC_TDSA_UpSample
+from .building_blocks import TFC_TDT, TFC_TDT_DownSample, TFC_TDT_UpSample
 
-class TFC_TDSA_UNet(nn.Module):
+class TFC_TDT_UNet(nn.Module):
     r"""
-    Self Attention variant of TFC-TDF intermediate block as described in:
+    Self Attention variant of TFC-TDT intermediate block as described in:
     `Investigating U-Nets with various Intermediate Blocks for Spectrogram-based Singing Voice Separation`,
     arxiv: https://arxiv.org/abs/1912.02591
     
@@ -18,17 +18,16 @@ class TFC_TDSA_UNet(nn.Module):
     def __init__(self,
                  num_channels: int = 4,
                  unet_depth: int = 3,
-                 tfc_tdsa_internal_layers: int = 2,
+                 tfc_tdt_internal_layers: int = 2,
                  growth_rate: int = 24,
                  kernel_size: Tuple[int, int] = (3, 3),
                  frequency_bins: int = 1024, # n_fft = 2048
-                 num_attention_heads: int = 8,
-                 use_vanilla_self_attention: bool = False,
+                 dropout: float = 0.2,
                  activation: str = "ReLU",
                  bias: bool = False
         ):
-        super(TFC_TDSA_UNet, self).__init__()
-        self._check_init(num_channels, unet_depth, tfc_tdsa_internal_layers, growth_rate, kernel_size, frequency_bins, num_attention_heads, activation, bias)
+        super(TFC_TDT_UNet, self).__init__()
+        self._check_init(num_channels, unet_depth, tfc_tdt_internal_layers, growth_rate, kernel_size, frequency_bins, dropout, activation, bias)
 
         self.in_conv = nn.Conv2d(num_channels, growth_rate, kernel_size=(1, 3), padding=(0, 1), stride=1)
         self.relu = nn.ReLU()
@@ -38,27 +37,25 @@ class TFC_TDSA_UNet(nn.Module):
         self.down_blocks = nn.ModuleList()
         for blk_freq_bin_dim in block_freq_bin_dimensions[:unet_depth]:
             self.down_blocks.append(
-                TFC_TDSA_DownSample(
+                TFC_TDT_DownSample(
                     in_channels=growth_rate,
-                    num_layers=tfc_tdsa_internal_layers,
+                    num_layers=tfc_tdt_internal_layers,
                     growth_rate=growth_rate,
                     kernel_size=kernel_size,
                     frequency_bins=blk_freq_bin_dim,
-                    num_attention_heads=num_attention_heads,
-                    use_vanilla_self_attention=use_vanilla_self_attention,
+                    dropout=dropout,
                     activation=activation,
                     bias=bias
                 )
             )
 
-        self.mid_block = TFC_TDSA(
+        self.mid_block = TFC_TDT(
             in_channels=growth_rate,
-            num_layers=tfc_tdsa_internal_layers,
+            num_layers=tfc_tdt_internal_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=block_freq_bin_dimensions[-1],
-            num_attention_heads=num_attention_heads,
-            use_vanilla_self_attention=use_vanilla_self_attention,
+            dropout=dropout,
             activation=activation,
             bias=bias
         )
@@ -66,14 +63,13 @@ class TFC_TDSA_UNet(nn.Module):
         self.up_blocks = nn.ModuleList()
         for blk_freq_bin_dim in reversed(block_freq_bin_dimensions[1:]):
             self.up_blocks.append(
-                TFC_TDSA_UpSample(
+                TFC_TDT_UpSample(
                     in_channels=2*growth_rate,
-                    num_layers=tfc_tdsa_internal_layers,
+                    num_layers=tfc_tdt_internal_layers,
                     growth_rate=growth_rate,
                     kernel_size=kernel_size,
                     frequency_bins=blk_freq_bin_dim,
-                    num_attention_heads=num_attention_heads,
-                    use_vanilla_self_attention=use_vanilla_self_attention,
+                    dropout=dropout,
                     activation=activation,
                     bias=bias
                 )
@@ -83,7 +79,7 @@ class TFC_TDSA_UNet(nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         r"""
-        Forward pass of the TFC-TDF UNet
+        Forward pass of the TFC-TDT UNet
 
         Args:
             x (torch.Tensor): Tensor of dimension (batch, channel, time, freq)
@@ -132,4 +128,4 @@ class TFC_TDSA_UNet(nn.Module):
             raise ValueError("frequency_bins must be divisible by 2 ** unet_depth")
 
 
-__all__ = ['TFC_TDSA_UNet']
+__all__ = ['TFC_TDT_UNet']

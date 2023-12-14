@@ -6,16 +6,15 @@ import unittest
 import torch
 import torch.nn as nn
 
-from source.model.basicBlocks import (
+from source.model.basic_blocks import (
     TimeFrequencyConvolutionBlock,
-    TimeDistributedFullyConnectedBlock,
+    TimeDistributedTransformerBlock,
     DownSample2DBlock,
     UpSample2DBlock,
 )
-from source.model.TFC_TDF_UNet.buildingBlocks import (
-    TFC_TDF_v1,
-    TFC_TDF_v1_DownSample,
-    TFC_TDF_v1_UpSample,
+from source.model.unet_blocks import UNetBlock, UNetDownSampleBlock, UNetUpSampleBlock
+from source.model.TFC_TDT_UNet.building_blocks import (
+    TFC_TDT, TFC_TDT_DownSample, TFC_TDT_UpSample
 )
 
 
@@ -26,22 +25,41 @@ class TestIntermediateBlock(unittest.TestCase):
         growth_rate = 8
         kernel_size = (3, 3)
         frequency_bins = 1024
-        bottleneck = 4
         activation = "ReLU"
         bias = False
 
-        tfc_tdf_block = TFC_TDF_v1(
+        tfc_tdt_block = TFC_TDT(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
             activation=activation,
             bias=bias
         )
 
-        self.assertIsInstance(tfc_tdf_block, nn.Module)
+        self.assertIsInstance(tfc_tdt_block, nn.Module)
+    
+    def test_init_is_UNetBlock(self):
+        in_channels = 4
+        num_layers = 2
+        growth_rate = 8
+        kernel_size = (3, 3)
+        frequency_bins = 1024
+        activation = "ReLU"
+        bias = False
+
+        tfc_tdt_block = TFC_TDT(
+            in_channels=in_channels,
+            num_layers=num_layers,
+            growth_rate=growth_rate,
+            kernel_size=kernel_size,
+            frequency_bins=frequency_bins,
+            activation=activation,
+            bias=bias
+        )
+
+        self.assertIsInstance(tfc_tdt_block, UNetBlock)
     
     def test_init_architecture(self):
         in_channels = 4
@@ -49,17 +67,16 @@ class TestIntermediateBlock(unittest.TestCase):
         growth_rate = 8
         kernel_size = (3, 3)
         frequency_bins = 1024
-        bottleneck = 4
+        dropout = 0.2
         activation = "ReLU"
         bias = False
 
-        tfc_tdf_block = TFC_TDF_v1(
+        tfc_tdt_block = TFC_TDT(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
             activation=activation,
             bias=bias
         )
@@ -72,19 +89,18 @@ class TestIntermediateBlock(unittest.TestCase):
             activation=activation,
             bias=bias
         )
-        expected_tdf_block = TimeDistributedFullyConnectedBlock(
-            channels=growth_rate,
-            frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+
+        expected_tdt_block = TimeDistributedTransformerBlock(
+            embed_dim=frequency_bins,
             num_layers=num_layers,
-            activation=activation,
-            bias=bias
+            dropout=dropout,
+            seq_length=frequency_bins,
         )
 
-        self.assertEqual(tfc_tdf_block.tfc_block.__str__(), 
+        self.assertEqual(tfc_tdt_block.tfc_block.__str__(), 
                          expected_tfc_block.__str__())
-        self.assertEqual(tfc_tdf_block.tdf_block.__str__(), 
-                         expected_tdf_block.__str__())
+        self.assertEqual(tfc_tdt_block.tdt_block.__str__(), 
+                         expected_tdt_block.__str__())
 
     def test_forward_output_dims(self):
         in_channels = 4
@@ -92,7 +108,7 @@ class TestIntermediateBlock(unittest.TestCase):
         growth_rate = 8
         kernel_size = (3, 3)
         frequency_bins = 1024
-        bottleneck = 4
+        dropout = 0.2
         activation = "ReLU"
         bias = False
 
@@ -101,53 +117,78 @@ class TestIntermediateBlock(unittest.TestCase):
             "mps" if torch.backends.mps.is_available() else
             "cpu")
 
-        tfc_tdf_block = TFC_TDF_v1(
+        tfc_tdt_block = TFC_TDT(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+            dropout=dropout,
             activation=activation,
             bias=bias
         ).to(device)
 
-        x = torch.rand([1, in_channels, 44, 1024]).to(device) # [batch, channel, n_frames, frequency_bins]
-        output = tfc_tdf_block(x)
-        expected_shape = [1, growth_rate, 44, 1024]
+        x = torch.rand([1, in_channels, 44, frequency_bins]).to(device) # [batch, channel, n_frames, frequency_bins]
+        output = tfc_tdt_block(x)
+        expected_shape = [1, growth_rate, 44, frequency_bins]
 
         self.assertEqual(list(output.shape), expected_shape)
 
 
-class TestTFC_TDF_v1_Downsample(unittest.TestCase):
+
+class TestDownSampleBlock(unittest.TestCase):
+    def test_init_is_UNetDownSampleBlock(self):
+        in_channels = 4
+        num_layers = 2
+        growth_rate = 8
+        kernel_size = (3, 3)
+        frequency_bins = 1024
+        dropout = 0.2
+        activation = "ReLU"
+        bias = False
+
+        tfc_tdt_downsample_block = TFC_TDT_DownSample(
+            in_channels=in_channels,
+            num_layers=num_layers,
+            growth_rate=growth_rate,
+            kernel_size=kernel_size,
+            frequency_bins=frequency_bins,
+            dropout=dropout,
+            activation=activation,
+            bias=bias
+        )
+
+
+        self.assertIsInstance(tfc_tdt_downsample_block, UNetDownSampleBlock)
+    
     def test_init_architecture(self):
         in_channels = 4
         num_layers = 2
         growth_rate = 8
         kernel_size = (3, 3)
         frequency_bins = 1024
-        bottleneck = 4
+        dropout = 0.2
         activation = "ReLU"
         bias = False
 
-        tfc_tdf_downsample_block = TFC_TDF_v1_DownSample(
+        tfc_tdt_downsample_block = TFC_TDT_DownSample(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+            dropout=dropout,
             activation=activation,
             bias=bias
         )
 
-        expected_tfc_tdf_block = TFC_TDF_v1(
+        expected_tfc_tdt_block = TFC_TDT(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+            dropout=dropout,
             activation=activation,
             bias=bias
         )
@@ -159,18 +200,20 @@ class TestTFC_TDF_v1_Downsample(unittest.TestCase):
             bias=bias
         )
 
-        self.assertEqual(tfc_tdf_downsample_block.tfc_tdf_block.__str__(), 
-                         expected_tfc_tdf_block.__str__())
-        self.assertEqual(tfc_tdf_downsample_block.downsample.__str__(), 
+        self.assertEqual(tfc_tdt_downsample_block.unet_block.__str__(), 
+                         expected_tfc_tdt_block.__str__())
+        
+        self.assertEqual(tfc_tdt_downsample_block.down_block.__str__(), 
                          expected_downsample_block.__str__())
-    
+
+
     def test_forward_output_dims(self):
         in_channels = 4
         num_layers = 2
         growth_rate = 8
         kernel_size = (3, 3)
         frequency_bins = 1024
-        bottleneck = 256
+        dropout = 0.2
         activation = "ReLU"
         bias = False
 
@@ -178,55 +221,79 @@ class TestTFC_TDF_v1_Downsample(unittest.TestCase):
             "cuda" if torch.cuda.is_available() else
             "mps" if torch.backends.mps.is_available() else
             "cpu")
-
-        tfc_tdf_downsample_block = TFC_TDF_v1_DownSample(
+        
+        tfc_tdt_downsample_block = TFC_TDT_DownSample(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+            dropout=dropout,
             activation=activation,
             bias=bias
         ).to(device)
 
-        input = torch.rand([1, in_channels, 44, 1024]).to(device)
-        output = tfc_tdf_downsample_block(input)
-        expected_shape = [1, growth_rate, 22, 512]
+
+        x = torch.rand([1, in_channels, 44, frequency_bins]).to(device) # [batch, channel, n_frames, frequency_bins]
+        output = tfc_tdt_downsample_block(x)
+        expected_shape = [1, growth_rate, 22, frequency_bins // 2]
 
         self.assertEqual(list(output.shape), expected_shape)
 
 
+class TestUpSampleBlock(unittest.TestCase):
+    def test_init_is_UNetUpSampleBlock(self):
+        in_channels = 4
+        num_layers = 2
+        growth_rate = 8
+        kernel_size = (3, 3)
+        frequency_bins = 1024
+        dropout = 0.2
+        activation = "ReLU"
+        bias = False
 
-class TestTFC_TDF_v1_UpSample(unittest.TestCase):
+        tfc_tdt_upsample_block = TFC_TDT_UpSample(
+            in_channels=in_channels,
+            num_layers=num_layers,
+            growth_rate=growth_rate,
+            kernel_size=kernel_size,
+            frequency_bins=frequency_bins,
+            dropout=dropout,
+            activation=activation,
+            bias=bias
+        )
+
+
+        self.assertIsInstance(tfc_tdt_upsample_block, UNetUpSampleBlock)
+    
     def test_init_architecture(self):
         in_channels = 4
         num_layers = 2
         growth_rate = 8
         kernel_size = (3, 3)
         frequency_bins = 1024
-        bottleneck = 256
+        dropout = 0.2
         activation = "ReLU"
         bias = False
 
-        tfc_tdf_downsample_block = TFC_TDF_v1_UpSample(
+        tfc_tdt_upsample_block = TFC_TDT_UpSample(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+            dropout=dropout,
             activation=activation,
             bias=bias
         )
 
-        expected_tfc_tdf_block = TFC_TDF_v1(
+        expected_tfc_tdt_block = TFC_TDT(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+            dropout=dropout,
             activation=activation,
             bias=bias
         )
@@ -238,18 +305,20 @@ class TestTFC_TDF_v1_UpSample(unittest.TestCase):
             bias=bias
         )
 
-        self.assertEqual(tfc_tdf_downsample_block.tfc_tdf_block.__str__(), 
-                         expected_tfc_tdf_block.__str__())
-        self.assertEqual(tfc_tdf_downsample_block.upsample.__str__(), 
+        self.assertEqual(tfc_tdt_upsample_block.unet_block.__str__(), 
+                         expected_tfc_tdt_block.__str__())
+        
+        self.assertEqual(tfc_tdt_upsample_block.up_block.__str__(), 
                          expected_downsample_block.__str__())
-    
+
+
     def test_forward_output_dims(self):
         in_channels = 4
         num_layers = 2
         growth_rate = 8
         kernel_size = (3, 3)
-        frequency_bins = 512
-        bottleneck = 256
+        frequency_bins = 1024
+        dropout = 0.2
         activation = "ReLU"
         bias = False
 
@@ -258,23 +327,27 @@ class TestTFC_TDF_v1_UpSample(unittest.TestCase):
             "mps" if torch.backends.mps.is_available() else
             "cpu")
 
-        tfc_tdf_downsample_block = TFC_TDF_v1_UpSample(
+        tfc_tdt_upsample_block = TFC_TDT_UpSample(
             in_channels=in_channels,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            bottleneck=bottleneck,
+            dropout=dropout,
             activation=activation,
             bias=bias
         ).to(device)
 
-        input = torch.rand([1, in_channels, 22, 512]).to(device)
-        output = tfc_tdf_downsample_block(input)
-        expected_shape = [1, growth_rate, 44, 1024]
+        x = torch.rand([1, in_channels, 22, frequency_bins]).to(device) # [batch, channel, n_frames, frequency_bins]
+        output = tfc_tdt_upsample_block(x)
+        expected_shape = [1, growth_rate, 44, frequency_bins * 2]
 
         self.assertEqual(list(output.shape), expected_shape)
-
-
 if __name__ == "__main__":
+    # suite = unittest.TestSuite()
+
+    # suite.addTest(TestDownSampleBlock("test_forward_output_dims"))
+
+    # runner = unittest.TextTestRunner()
+    # runner.run(suite)
     unittest.main()

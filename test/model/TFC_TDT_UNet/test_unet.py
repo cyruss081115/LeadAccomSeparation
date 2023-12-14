@@ -6,14 +6,14 @@ import unittest
 import torch
 import torch.nn as nn
 
-from source.model.TFC_TDSA_UNet.unet import TFC_TDSA_UNet
-from source.model.TFC_TDSA_UNet.building_blocks import (
-    TFC_TDSA,
-    TFC_TDSA_DownSample,
-    TFC_TDSA_UpSample,
+from source.model.TFC_TDT_UNet.unet import TFC_TDT_UNet
+from source.model.TFC_TDT_UNet.building_blocks import (
+    TFC_TDT,
+    TFC_TDT_DownSample,
+    TFC_TDT_UpSample,
 )
 
-class TestTFC_TDSA_UNet(unittest.TestCase):
+class TestTFC_TDT_UNet(unittest.TestCase):
     def test_init_is_nn_Module(self):
         num_channels = 2
         unet_depth = 3
@@ -21,20 +21,18 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
         growth_rate = 8
         kernel_size = (3, 3)
         frequency_bins = 1024
-        num_attention_heads = 8
-        use_vanilla_self_attention = False
+        dropout = 0.2
         activation = "ReLU"
         bias = False
 
-        unet = TFC_TDSA_UNet(
+        unet = TFC_TDT_UNet(
             num_channels=num_channels,
             unet_depth=unet_depth,
-            tfc_tdsa_internal_layers=num_layers,
+            tfc_tdt_internal_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            num_attention_heads=num_attention_heads,
-            use_vanilla_self_attention=use_vanilla_self_attention,
+            dropout=dropout,
             activation=activation,
             bias=bias
         )
@@ -48,18 +46,18 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
         growth_rate = 8
         kernel_size = (3, 3)
         frequency_bins = 1024
-        num_attention_heads = 8
+        dropout = 0.2
         activation = "LeakyReLU"
         bias = False
 
-        unet = TFC_TDSA_UNet(
+        unet = TFC_TDT_UNet(
             num_channels=num_channels,
             unet_depth=unet_depth,
-            tfc_tdsa_internal_layers=num_layers,
+            tfc_tdt_internal_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            num_attention_heads=num_attention_heads,
+            dropout=dropout,
             activation=activation,
             bias=bias
         )
@@ -76,28 +74,28 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
         self.assertIsInstance(unet.down_blocks, nn.ModuleList)
         self.assertEqual(len(unet.down_blocks), unet_depth)
         for i, down_block in enumerate(unet.down_blocks):
-            self.assertIsInstance(down_block, TFC_TDSA_DownSample)
-            expected_downsample_block = TFC_TDSA_DownSample(
+            self.assertIsInstance(down_block, TFC_TDT_DownSample)
+            expected_downsample_block = TFC_TDT_DownSample(
                 in_channels=growth_rate,
                 num_layers=num_layers,
                 growth_rate=growth_rate,
                 kernel_size=kernel_size,
                 frequency_bins=frequency_bins // (2 ** i),
-                num_attention_heads=num_attention_heads,
+                dropout=dropout,
                 activation=activation,
                 bias=bias
             )
             self.assertEqual(down_block.__str__(), expected_downsample_block.__str__())
         
         # Test Mid Block
-        self.assertIsInstance(unet.mid_block, TFC_TDSA)
-        expected_mid_block = TFC_TDSA(
+        self.assertIsInstance(unet.mid_block, TFC_TDT)
+        expected_mid_block = TFC_TDT(
             in_channels=growth_rate,
             num_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins // (2 ** unet_depth),
-            num_attention_heads=num_attention_heads,
+            dropout=dropout,
             activation=activation,
             bias=bias
         )
@@ -107,14 +105,14 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
         self.assertIsInstance(unet.up_blocks, nn.ModuleList)
         self.assertEqual(len(unet.up_blocks), unet_depth)
         for i, up_block in enumerate(unet.up_blocks):
-            self.assertIsInstance(up_block, TFC_TDSA_UpSample)
-            expected_upsample_block = TFC_TDSA_UpSample(
+            self.assertIsInstance(up_block, TFC_TDT_UpSample)
+            expected_upsample_block = TFC_TDT_UpSample(
                 in_channels=2*growth_rate,
                 num_layers=num_layers,
                 growth_rate=growth_rate,
                 kernel_size=kernel_size,
                 frequency_bins=(frequency_bins // (2 ** (unet_depth - i))),
-                num_attention_heads=num_attention_heads,
+                dropout=dropout,
                 activation=activation,
                 bias=bias
             )
@@ -127,7 +125,7 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
         growth_rate = 24
         kernel_size = (3, 3)
         frequency_bins = 1024
-        num_attention_heads = 8
+        dropout = 0.2
         activation = "LeakyReLU"
         bias = False
 
@@ -137,22 +135,22 @@ class TestTFC_TDSA_UNet(unittest.TestCase):
             "cpu"
         )
 
-        unet = TFC_TDSA_UNet(
+        unet = TFC_TDT_UNet(
             num_channels=num_channels,
             unet_depth=unet_depth,
-            tfc_tdsa_internal_layers=num_layers,
+            tfc_tdt_internal_layers=num_layers,
             growth_rate=growth_rate,
             kernel_size=kernel_size,
             frequency_bins=frequency_bins,
-            num_attention_heads=num_attention_heads,
+            dropout=dropout,
             activation=activation,
             bias=bias
         ).to(device)
 
-        x = torch.rand([1, 2, 320, 1024]).to(device) #
+        x = torch.rand([1, 2, 32, 1024]).to(device) #
         y = unet(x)
 
-        self.assertEqual(list(y.shape), [1, 2, 320, 1024])
+        self.assertEqual(list(y.shape), [1, 2, 32, 1024])
 
 
 if __name__ == "__main__":
