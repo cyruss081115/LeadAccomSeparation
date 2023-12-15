@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from abc import ABC
 
-from source.model.basic_blocks import DownSample2DBlock, UpSample2DBlock
+from .basic_blocks import DownSample2DBlock, UpSample2DBlock
 
 
 class UNetBlock(nn.Module, ABC):
