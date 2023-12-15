@@ -52,8 +52,7 @@ The average validation loss values across the 13 epochs are reported in the tabl
 │   │   ├── TFC_TDF_UNet
 │   │   │   ├── __init__.py
 │   │   │   ├── building_blocks.py
-│   │   │   ├── unet.py
-│   │   │   └── weights
+│   │   │   └── unet.py
 │   │   ├── TFC_TDSA_UNet
 │   │   │   ├── __init__.py
 │   │   │   ├── building_blocks.py
@@ -63,6 +62,7 @@ The average validation loss values across the 13 epochs are reported in the tabl
 │   │   │   ├── building_blocks.py
 │   │   │   ├── unet.py
 │   │   │   └── weights
+│   │   │       └── vocals_transformer_0511.pth
 │   │   ├── __init__.py
 │   │   ├── attention.py
 │   │   ├── basic_blocks.py
