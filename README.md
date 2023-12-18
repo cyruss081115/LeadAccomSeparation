@@ -1,6 +1,6 @@
 # Lead and Accompaniment Separation
 ## Description 
-In this project, we present two novel attention-based variants of the TFC-TDF-UNet architecture, namely TFC-TDSA-UNet and TFC-TDT-UNet, aiming to further improve the performance of lead and accompaniment separation. The models adopt the Complex as Channel (CaC) framework to estimate a vocal isolated spectrogram. Experiments on MUSDB18-HQ benchmark show the superior training speed of the UNet architecture, and demonstrate the effectiveness of attention mechanism on music separation tasks.
+In this project, we present two novel attention-based variants of the TFC-TDF-UNet architecture, namely TFC-TDSA-UNet and TFC-TDT-UNet, aiming to further improve the performance of lead and accompaniment separation. The models adopt the Complex as Channel (CaC) framework to estimate a vocal isolated spectrogram. Experiments on MUSDB18-HQ benchmark show the superior training speed of the UNet architecture, and demonstrate the effectiveness of attention mechanism on music separation tasks. [Access report](./assets/report.pdf)
 
 ## Usage
 1. Run the following commands to install dependencies
