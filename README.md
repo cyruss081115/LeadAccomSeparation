@@ -47,7 +47,6 @@ The average validation loss values across the 13 epochs are reported in the tabl
 │   ├── train_accelerate.py
 │   └── train_openunmix.py
 ├── source
-│   ├── __pycache__
 │   ├── model
 │   │   ├── TFC_TDF_UNet
 │   │   │   ├── __init__.py
